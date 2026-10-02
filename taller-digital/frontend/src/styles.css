@@ -1,0 +1,142 @@
+/* =========================================================================
+   Taller Digital — estilos globales
+   Pensado para usar con el celular en la mano y para gente que no es
+   fanática de la tecnología: letra grande, botones grandes, una acción
+   principal por pantalla.
+   ========================================================================= */
+
+:root {
+  /* Color */
+  --grafito: #1e262d;
+  --grafito-2: #2c3843;
+  --texto: #1e262d;
+  --texto-suave: #5b6770;
+  --linea: #d8dde1;
+  --fondo: #edeff1;
+  --superficie: #ffffff;
+  --ambar: #f0b429;
+  --ambar-suave: #fef6e0;
+  --azul: #2f6fb0;
+  --naranja: #d9622b;
+  --verde: #2e8b57;
+  --verde-oscuro: #236b43;
+  --rojo: #b3261e;
+  --gris: #8a949b;
+  --placa-azul: #1f4e9c;
+  --whatsapp: #1fa855;
+
+  /* Tipografía */
+  --fuente: 'Archivo', system-ui, sans-serif;
+  --fuente-angosta: 'Archivo Narrow', 'Archivo', system-ui, sans-serif;
+
+  /* Medidas */
+  --radio: 8px;
+  --toque: 52px; /* alto mínimo de botones e inputs */
+  --ancho-max: 1180px;
+}
+
+* { box-sizing: border-box; }
+
+html { font-size: 17px; -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  font-family: var(--fuente);
+  color: var(--texto);
+  background: var(--fondo);
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 { margin: 0; line-height: 1.2; }
+h1 { font-size: 1.55rem; font-weight: 700; }
+h2 { font-size: 1.2rem; font-weight: 700; }
+h3 { font-size: 1rem; font-weight: 600; }
+p { margin: 0; }
+a { color: var(--azul); }
+
+:focus-visible { outline: 3px solid var(--azul); outline-offset: 2px; }
+
+.contenedor { max-width: var(--ancho-max); margin: 0 auto; padding: 20px 16px 48px; }
+.angosto { max-width: 680px; }
+.suave { color: var(--texto-suave); }
+
+/* ---------- Botones ---------- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: var(--toque); padding: 0 20px;
+  border: 0; border-radius: var(--radio);
+  font: 600 1rem var(--fuente); text-decoration: none; text-align: center;
+  cursor: pointer; transition: background-color .15s;
+}
+.btn:disabled { opacity: .55; cursor: not-allowed; }
+.btn-primario { background: var(--ambar); color: var(--grafito); }
+.btn-primario:hover:not(:disabled) { background: #e6a817; }
+.btn-oscuro { background: var(--grafito); color: #fff; }
+.btn-oscuro:hover:not(:disabled) { background: var(--grafito-2); }
+.btn-verde { background: var(--verde); color: #fff; }
+.btn-verde:hover:not(:disabled) { background: var(--verde-oscuro); }
+.btn-whatsapp { background: var(--whatsapp); color: #fff; }
+.btn-whatsapp:hover:not(:disabled) { background: #188a45; }
+.btn-borde { background: var(--superficie); color: var(--texto); border: 1.5px solid var(--linea); }
+.btn-borde:hover:not(:disabled) { border-color: var(--gris); }
+.btn-texto, .btn-peligro {
+  background: none; border: 0; min-height: 44px; padding: 0 8px;
+  font: 500 .95rem var(--fuente); cursor: pointer;
+}
+.btn-texto { color: var(--texto-suave); text-decoration: underline; }
+.btn-peligro { color: var(--rojo); }
+.btn-texto:hover, .btn-peligro:hover { color: var(--texto); }
+.btn-peligro:hover { color: #8c1d17; }
+.btn-ancho { width: 100%; }
+
+/* ---------- Formularios ---------- */
+.campo { display: flex; flex-direction: column; gap: 6px; }
+.campo label { font-weight: 600; font-size: .95rem; }
+.campo .ayuda { font-size: .85rem; color: var(--texto-suave); }
+.input, .textarea {
+  width: 100%; min-height: var(--toque); padding: 12px 14px;
+  border: 1.5px solid var(--linea); border-radius: var(--radio);
+  background: var(--superficie); color: var(--texto);
+  font: 400 1rem var(--fuente);
+}
+.textarea { min-height: 96px; resize: vertical; }
+.input:focus, .textarea:focus { border-color: var(--azul); outline: none; box-shadow: 0 0 0 3px rgb(47 111 176 / .18); }
+.fila { display: grid; gap: 14px; }
+@media (min-width: 640px) { .fila-2 { grid-template-columns: 1fr 1fr; } }
+
+/* Selector de opciones grandes (auto/moto, tipo de ítem) */
+.opciones { display: flex; gap: 8px; flex-wrap: wrap; }
+.opcion {
+  flex: 1; min-height: var(--toque); min-width: 100px; padding: 0 12px;
+  border: 1.5px solid var(--linea); border-radius: var(--radio); background: var(--superficie);
+  font: 600 1rem var(--fuente); color: var(--texto); cursor: pointer;
+}
+.opcion[aria-pressed='true'] { border-color: var(--grafito); background: var(--grafito); color: #fff; }
+
+/* ---------- Superficies ---------- */
+.panel { background: var(--superficie); border: 1px solid var(--linea); border-radius: 10px; padding: 18px; }
+.panel + .panel { margin-top: 14px; }
+
+/* ---------- Avisos ---------- */
+.aviso { padding: 12px 14px; border-radius: var(--radio); font-size: .95rem; }
+.aviso-error { background: #fdecea; color: var(--rojo); border: 1px solid #f5c2bd; }
+.aviso-ok { background: #e7f4ec; color: var(--verde-oscuro); border: 1px solid #bfe0cc; }
+.aviso-info { background: var(--ambar-suave); color: var(--texto); border: 1px solid #f3d27d; }
+
+/* ---------- Estado de la orden ---------- */
+.estado { display: inline-flex; align-items: center; gap: 7px; font-weight: 600; font-size: .9rem; }
+.estado::before { content: ''; width: 10px; height: 10px; border-radius: 50%; background: var(--c, var(--gris)); flex: none; }
+.estado-recibido { --c: var(--gris); }
+.estado-diagnostico { --c: var(--azul); }
+.estado-esperando_aprobacion { --c: var(--ambar); }
+.estado-en_reparacion { --c: var(--naranja); }
+.estado-listo { --c: var(--verde); }
+.estado-entregado { --c: var(--grafito); }
+.estado-cancelada { --c: var(--rojo); }
+
+.cargando { padding: 40px 0; text-align: center; color: var(--texto-suave); }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}

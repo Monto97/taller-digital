@@ -1,0 +1,160 @@
+/** Tipos que devuelve la API. Reflejan docs/API.md. */
+
+export type EstadoOrden =
+  | 'recibido'
+  | 'diagnostico'
+  | 'esperando_aprobacion'
+  | 'en_reparacion'
+  | 'listo'
+  | 'entregado'
+  | 'cancelada';
+
+export type TipoVehiculo = 'auto' | 'moto';
+export type TipoItem = 'repuesto' | 'mano_de_obra' | 'otro';
+export type PlantillaWhatsapp = 'recibido' | 'presupuesto' | 'listo';
+
+export interface Usuario {
+  id: number;
+  nombre: string;
+  email: string;
+  rol: 'dueno' | 'mecanico';
+}
+
+export interface Taller {
+  id: number;
+  nombre: string;
+  slug: string;
+}
+
+export interface Sesion {
+  token: string;
+  usuario: Usuario;
+  taller: Taller;
+}
+
+export interface ClienteResumen {
+  id: number;
+  nombre: string;
+  telefono: string | null;
+}
+
+export interface Vehiculo {
+  id: number;
+  patente: string;
+  tipo: TipoVehiculo;
+  marca: string | null;
+  modelo: string | null;
+  anio: number | null;
+  color: string | null;
+  km_actual: number | null;
+  cliente: ClienteResumen;
+  visitas: number;
+  ultima_visita: string | null;
+  orden_activa: { id: number; numero: number; estado: EstadoOrden } | null;
+  proximo_servicio: { descripcion: string; fecha_estimada: string | null; km_estimado: number | null } | null;
+}
+
+export interface Item {
+  id: number;
+  tipo: TipoItem;
+  descripcion: string;
+  cantidad: string;
+  precio_unitario: string;
+  subtotal: string;
+}
+
+export interface Evento {
+  id: number;
+  tipo: 'creada' | 'cambio_estado' | 'presupuesto_enviado' | 'presupuesto_aprobado' | 'presupuesto_rechazado' | 'aviso_whatsapp' | 'nota';
+  estado_desde: EstadoOrden | null;
+  estado_hasta: EstadoOrden | null;
+  detalle: string | null;
+  created_at: string;
+  usuario_nombre: string | null;
+}
+
+export interface Orden {
+  id: number;
+  numero: number;
+  estado: EstadoOrden;
+  estado_etiqueta: string;
+  estados_siguientes: EstadoOrden[];
+  motivo: string;
+  diagnostico: string | null;
+  km_ingreso: number | null;
+  total: string;
+  presupuesto: { estado: 'borrador' | 'enviado' | 'aprobado' | 'rechazado'; enviado_at: string | null; respondido_at: string | null };
+  fecha_ingreso: string;
+  fecha_estimada_entrega: string | null;
+  fecha_entrega: string | null;
+  link_publico: string;
+  vehiculo: { id: number; patente: string; tipo: TipoVehiculo; marca: string | null; modelo: string | null; anio: number | null; km_actual: number | null };
+  cliente: ClienteResumen;
+  mecanico: { id: number; nombre: string } | null;
+  items: Item[];
+  eventos: Evento[];
+  /** Solo viene en las respuestas de acciones que generan un aviso (crear, enviar presupuesto, pasar a listo). */
+  whatsapp_url?: string | null;
+}
+
+export interface TarjetaTablero {
+  id: number;
+  numero: number;
+  patente: string;
+  tipo: TipoVehiculo;
+  vehiculo: string | null;
+  cliente: string;
+  motivo: string;
+  total: string;
+  mecanico: { id: number; nombre: string } | null;
+  fecha_ingreso: string;
+  fecha_estimada_entrega: string | null;
+}
+
+export interface Tablero {
+  resumen: { en_taller: number; listos: number; presupuestos_sin_respuesta: number; entregados_hoy: number };
+  columnas: Record<'recibido' | 'diagnostico' | 'esperando_aprobacion' | 'en_reparacion' | 'listo', TarjetaTablero[]>;
+}
+
+export interface OrdenHistorial {
+  id: number;
+  numero: number;
+  estado: EstadoOrden;
+  fecha_ingreso: string;
+  km_ingreso: number | null;
+  motivo: string;
+  diagnostico: string | null;
+  total: string;
+  mecanico: string | null;
+  items: Omit<Item, 'subtotal'>[];
+}
+
+/** Lo que ve el cliente desde el link de WhatsApp (GET /publico/ordenes/:token). */
+export interface OrdenPublica {
+  taller: { nombre: string; telefono: string | null; direccion: string | null; logo_url: string | null };
+  cliente: { nombre: string };
+  orden: {
+    numero: number;
+    estado: EstadoOrden;
+    estado_etiqueta: string;
+    motivo: string;
+    fecha_ingreso: string;
+    fecha_estimada_entrega: string | null;
+    fecha_entrega: string | null;
+  };
+  vehiculo: { patente: string; tipo: TipoVehiculo; marca: string | null; modelo: string | null };
+  presupuesto: {
+    estado: 'enviado' | 'aprobado' | 'rechazado';
+    total: string;
+    enviado_at: string | null;
+    respondido_at: string | null;
+    items: { tipo: TipoItem; descripcion: string; cantidad: string; precio_unitario: string; subtotal: string }[];
+  } | null;
+  linea_de_tiempo: { estado: EstadoOrden; fecha: string }[];
+}
+
+export interface ErrorApi {
+  codigo: string;
+  mensaje: string;
+  detalles?: Record<string, string | number>;
+}
