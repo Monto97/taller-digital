@@ -45,7 +45,14 @@ app.use('/api', noEncontrado); // cualquier /api desconocida responde 404 en JSO
 // En producción la misma app sirve el frontend de Angular.
 if (env.FRONTEND_DIST && fs.existsSync(env.FRONTEND_DIST)) {
   const index = path.join(env.FRONTEND_DIST, 'index.html');
-  app.use(express.static(env.FRONTEND_DIST, { index: false, maxAge: '7d' }));
+  app.use(express.static(env.FRONTEND_DIST, {
+    index: false,
+    maxAge: '7d',
+    // El service worker y el manifiesto se revisan en cada visita para que los cambios lleguen enseguida.
+    setHeaders: (res, ruta) => {
+      if (/(sw\.js|manifest\.webmanifest)$/.test(ruta)) res.set('Cache-Control', 'no-cache');
+    },
+  }));
   // Las rutas de Angular (/ordenes/5, /o/abc...) devuelven index.html, sin cache para tomar cada deploy.
   app.get('/{*ruta}', (_req, res) => res.set('Cache-Control', 'no-cache').sendFile(index));
 }
