@@ -1,6 +1,6 @@
 /**
- * Da de alta un taller con su usuario dueño. Es la forma de crear talleres
- * en producción, donde el registro por la API está cerrado.
+ * Da de alta un taller con su usuario dueño desde la terminal, sin pasar
+ * por la pantalla de registro.
  *
  *   node scripts/crear-taller.js "Taller Rodríguez" "Diego Rodríguez" diego@mail.com "clave-segura" "2241 15 68-9216"
  *

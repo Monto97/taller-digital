@@ -29,7 +29,6 @@ API REST en JSON. Base URL en desarrollo: `http://localhost:3000/api`.
 | 401 | `NO_AUTENTICADO` | Falta el token o expiró. |
 | 401 | `CREDENCIALES_INVALIDAS` | Email o contraseña incorrectos (no se distingue cuál, a propósito). |
 | 403 | `CUENTA_INACTIVA` | El usuario o el taller están desactivados. |
-| 403 | `REGISTRO_CERRADO` | El registro de talleres no está habilitado o falta el header `X-Clave-Registro`. |
 | 403 | `SIN_PERMISO` | El rol no alcanza para esa acción. |
 | 404 | `NO_ENCONTRADO` | No existe o pertenece a otro taller (no se distingue a propósito). |
 | 409 | `EMAIL_EN_USO` | Ya existe una cuenta con ese email. |
@@ -61,11 +60,7 @@ Chequea que la API y la base respondan: `{ "estado": "ok" }`. Sirve para el heal
 ## Auth
 
 ### `POST /auth/registro`
-Crea un taller y su usuario dueño. Lo usás vos para dar de alta talleres, no los usuarios finales:
-
-- Si el backend tiene `REGISTRO_CLAVE`, hay que mandar el header `X-Clave-Registro` con ese valor.
-- En producción sin `REGISTRO_CLAVE`, responde `403 REGISTRO_CERRADO`.
-- En desarrollo sin clave queda abierto.
+Crea un taller y su usuario dueño. Es abierto: lo usa la pantalla `/registro` del front para que cada taller cree su cuenta. Tiene el mismo límite de intentos que el login.
 
 También se puede crear un taller con `npm run crear-taller` desde `backend/`.
 
