@@ -1,12 +1,12 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { Router } from '@angular/router';
 import { errorDe } from '../../core/api.service';
 import { AuthService } from '../../core/auth';
 
 @Component({
   selector: 'app-ingresar',
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule],
   template: `
     <div class="fondo">
       <form class="caja" (ngSubmit)="ingresar()">
@@ -36,8 +36,6 @@ import { AuthService } from '../../core/auth';
         <button type="submit" class="btn btn-primario btn-ancho" [disabled]="enviando() || !email || !password">
           {{ enviando() ? 'Ingresando…' : 'Ingresar' }}
         </button>
-
-        <p class="pie suave">¿Todavía no tenés cuenta? <a routerLink="/registro">Creá tu taller</a></p>
       </form>
     </div>
   `,
@@ -48,7 +46,6 @@ import { AuthService } from '../../core/auth';
       padding: 28px 24px; display: flex; flex-direction: column; gap: 18px;
     }
     .marca { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 1.05rem; }
-    .pie { text-align: center; margin: 0; }
     .logo {
       width: 34px; height: 34px; border-radius: 7px; background: var(--ambar);
       display: grid; place-items: center; font: 700 16px var(--fuente-angosta);

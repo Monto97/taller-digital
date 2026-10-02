@@ -18,6 +18,8 @@ export interface Usuario {
   nombre: string;
   email: string;
   rol: 'dueno' | 'mecanico';
+  /** true solo para los emails de ADMIN_EMAILS: ve el panel de admin. */
+  admin?: boolean;
 }
 
 export interface Taller {
@@ -88,6 +90,8 @@ export interface Orden {
   fecha_estimada_entrega: string | null;
   fecha_entrega: string | null;
   link_publico: string;
+  /** Links de WhatsApp listos por plantilla. null si el cliente no tiene celular. */
+  whatsapp: Record<PlantillaWhatsapp, string> | null;
   vehiculo: { id: number; patente: string; tipo: TipoVehiculo; marca: string | null; modelo: string | null; anio: number | null; km_actual: number | null };
   cliente: ClienteResumen;
   mecanico: { id: number; nombre: string } | null;
@@ -151,6 +155,42 @@ export interface OrdenPublica {
     items: { tipo: TipoItem; descripcion: string; cantidad: string; precio_unitario: string; subtotal: string }[];
   } | null;
   linea_de_tiempo: { estado: EstadoOrden; fecha: string }[];
+}
+
+// ---------- Panel de admin ----------
+
+export interface AdminResumen {
+  talleres: { total: number; habilitados: number; nuevos_30d: number; activos_7d: number; con_ordenes: number };
+  ordenes: {
+    total: number; ultimos_7d: number; ultimos_30d: number; entregadas: number;
+    monto_entregado: string; monto_entregado_30d: string;
+  };
+  presupuestos: { enviados: number; aprobados: number; rechazados: number; aprobados_por_link: number };
+  whatsapp: { avisos: number; avisos_30d: number };
+  base: { vehiculos: number; clientes: number; usuarios: number };
+  ordenes_por_dia: { dia: string; ordenes: number }[];
+}
+
+export type UsoTaller = 'activo' | 'poco_uso' | 'inactivo' | 'sin_arrancar';
+
+export interface AdminTaller {
+  id: number;
+  nombre: string;
+  telefono: string | null;
+  direccion: string | null;
+  activo: boolean;
+  created_at: string;
+  dueno_nombre: string | null;
+  dueno_email: string | null;
+  usuarios: number;
+  ultimo_ingreso: string | null;
+  ordenes: number;
+  ordenes_7d: number;
+  en_taller: number;
+  vehiculos: number;
+  monto_entregado: string;
+  ultima_actividad: string | null;
+  uso: UsoTaller;
 }
 
 export interface ErrorApi {

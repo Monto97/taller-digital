@@ -1,0 +1,79 @@
+.encabezado { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end; justify-content: space-between; margin-bottom: 16px; }
+.oculto { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.panel + .panel, .metricas + .panel { margin-top: 14px; }
+h2 { margin-bottom: 12px; }
+.titulo-fila { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; justify-content: space-between; margin-bottom: 12px; }
+.titulo-fila h2 { margin: 0; }
+.acciones { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+
+/* Alta de taller */
+.alta { display: flex; flex-direction: column; gap: 14px; margin-bottom: 14px; border: 2px solid var(--ambar); }
+.alta h2 { margin: 0; }
+.con-boton { display: flex; gap: 8px; }
+.con-boton .input { font-family: var(--fuente-angosta); font-weight: 600; letter-spacing: .5px; }
+.clave { max-width: 460px; }
+
+.creado { margin-bottom: 14px; border: 2px solid var(--whatsapp); background: #effaf3; display: flex; flex-direction: column; gap: 12px; }
+.creado h2 { margin: 0; }
+.mensaje {
+  margin: 0; padding: 12px 14px; white-space: pre-wrap; background: var(--superficie);
+  border: 1px solid var(--linea); border-radius: var(--radio); font: 400 .95rem/1.5 var(--fuente);
+}
+
+/* Métricas */
+.metricas { display: grid; gap: 10px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 760px) { .metricas { grid-template-columns: repeat(2, minmax(0, 1fr)); } .metrica strong.monto { font-size: 1.25rem; } }
+.metrica {
+  display: flex; flex-direction: column; gap: 2px; padding: 14px 16px;
+  background: var(--superficie); border: 1px solid var(--linea); border-radius: 10px;
+}
+.etiqueta { font-size: .85rem; font-weight: 600; color: var(--texto-suave); }
+.metrica strong { font: 700 2rem/1.15 var(--fuente-angosta); }
+.metrica strong small { font-size: 1.1rem; color: var(--texto-suave); font-weight: 600; }
+.metrica strong.monto { font-size: 1.55rem; }
+.detalle { font-size: .82rem; color: var(--texto-suave); line-height: 1.35; }
+
+/* Gráfico de barras */
+.grafico { display: flex; align-items: flex-end; gap: 3px; height: 170px; padding-bottom: 22px; }
+.barra { flex: 1; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; position: relative; }
+.relleno { display: block; background: var(--ambar); border-radius: 3px 3px 0 0; min-height: 3px; }
+.relleno.vacia { background: var(--linea); }
+.barra:hover .relleno:not(.vacia) { background: var(--grafito); }
+.dia { position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%); font-size: .72rem; color: var(--texto-suave); white-space: nowrap; }
+
+/* Tabla de talleres */
+.tabla-scroll { overflow-x: auto; }
+.tabla { width: 100%; border-collapse: collapse; font-size: .92rem; }
+.tabla th {
+  text-align: left; font-size: .8rem; font-weight: 600; color: var(--texto-suave);
+  padding: 0 10px 8px; border-bottom: 1.5px solid var(--linea); white-space: nowrap;
+}
+.tabla td { padding: 12px 10px; border-bottom: 1px solid var(--linea); vertical-align: top; }
+.tabla .num { text-align: right; font-variant-numeric: tabular-nums; }
+.sub { display: block; font-size: .8rem; }
+.accion { text-align: right; white-space: nowrap; }
+.accion .btn { min-height: 40px; padding: 0 14px; }
+.deshabilitado td { opacity: .6; }
+.deshabilitado td.accion { opacity: 1; }
+
+.uso { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; white-space: nowrap; }
+.uso::before { content: ''; width: 9px; height: 9px; border-radius: 50%; background: var(--c); }
+.uso-activo { --c: var(--verde); }
+.uso-poco_uso { --c: var(--ambar); }
+.uso-inactivo { --c: var(--rojo); }
+.uso-sin_arrancar { --c: var(--gris); }
+.uso-deshabilitado { --c: var(--grafito); }
+
+/* En el celular la tabla pasa a tarjetas */
+@media (max-width: 760px) {
+  .tabla thead { display: none; }
+  .tabla, .tabla tbody, .tabla tr, .tabla td { display: block; width: 100%; }
+  .tabla tr { padding: 12px 0; border-bottom: 1px solid var(--linea); }
+  .tabla td { border: 0; padding: 3px 0; display: flex; justify-content: space-between; gap: 12px; text-align: right; }
+  .tabla td::before { content: attr(data-titulo); color: var(--texto-suave); font-size: .85rem; text-align: left; }
+  .tabla td:first-child { display: block; text-align: left; margin-bottom: 6px; }
+  .tabla td:first-child::before, .tabla td.accion::before { content: none; }
+  .tabla td.accion { justify-content: flex-start; margin-top: 4px; }
+  .sub { display: inline; margin-left: 6px; }
+  .tabla td:first-child .sub { display: block; margin: 0; }
+}

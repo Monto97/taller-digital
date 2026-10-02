@@ -1,7 +1,7 @@
 import { Component, OnInit, computed, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { ApiService, abrirWhatsapp, errorDe } from '../../core/api.service';
+import { ApiService, errorDe } from '../../core/api.service';
 import { EstadoOrden, Evento, Orden, PlantillaWhatsapp, TipoItem } from '../../core/modelos';
 import { CantidadPipe, CuandoPipe, ETIQUETA_ESTADO, KmPipe, Patente, PesosPipe, nombreVehiculo, textoAccion } from '../../shared/compartido';
 
@@ -40,16 +40,18 @@ const TIPOS_ITEM: { valor: TipoItem; texto: string }[] = [
 
         @if (error()) { <p class="aviso aviso-error" role="alert">{{ error() }}</p> }
 
-        <!-- Aviso por WhatsApp después de una acción -->
+        <!-- Aviso de "listo" después de marcarlo: va arriba, junto a los botones de estado -->
         @if (avisoPendiente(); as aviso) {
-          <div class="panel avisar">
-            <div>
-              <strong>{{ aviso.titulo }}</strong>
-              <p class="suave">Se abre WhatsApp con el mensaje escrito. Solo tenés que tocar enviar.</p>
+          @if (aviso.plantilla === 'listo') {
+            <div class="panel avisar">
+              <div>
+                <strong>{{ aviso.titulo }}</strong>
+                <p class="suave">Se abre WhatsApp con el mensaje escrito. Solo tenés que tocar enviar.</p>
+              </div>
+              <a class="btn btn-whatsapp" [href]="aviso.url" target="_blank" rel="noopener" (click)="avisoAbierto(aviso.plantilla)">Abrir WhatsApp</a>
+              <button type="button" class="btn-texto" (click)="avisoPendiente.set(null)">Ahora no</button>
             </div>
-            <button type="button" class="btn btn-whatsapp" (click)="abrirAviso()">Abrir WhatsApp</button>
-            <button type="button" class="btn-texto" (click)="avisoPendiente.set(null)">Ahora no</button>
-          </div>
+          }
         }
 
         <div class="grilla">
@@ -159,9 +161,22 @@ const TIPOS_ITEM: { valor: TipoItem; texto: string }[] = [
                   <button type="submit" class="btn btn-oscuro" [disabled]="!puedeAgregar() || ocupado()">Agregar al presupuesto</button>
                 </form>
 
-                @if (puedeEnviarPresupuesto()) {
+                @if (avisoPendiente()?.plantilla === 'presupuesto') {
+                  <!-- Recién enviado: el link para abrir WhatsApp aparece acá mismo, donde tocaste -->
+                  <div class="avisar">
+                    <div>
+                      <strong>{{ avisoPendiente()!.titulo }}</strong>
+                      <p class="suave">Se abre WhatsApp con el mensaje y el link. Solo tenés que tocar enviar.</p>
+                    </div>
+                    <a class="btn btn-whatsapp" [href]="avisoPendiente()!.url" target="_blank" rel="noopener" (click)="avisoAbierto('presupuesto')">Abrir WhatsApp</a>
+                  </div>
+                } @else if (o.presupuesto.estado === 'enviado' && o.whatsapp) {
+                  <a class="btn btn-whatsapp btn-ancho" [href]="o.whatsapp.presupuesto" target="_blank" rel="noopener" (click)="avisoAbierto('presupuesto')">
+                    Reenviar presupuesto por WhatsApp
+                  </a>
+                } @else if (puedeEnviarPresupuesto()) {
                   <button type="button" class="btn btn-whatsapp btn-ancho" [disabled]="ocupado()" (click)="enviarPresupuesto()">
-                    {{ o.presupuesto.estado === 'enviado' ? 'Reenviar presupuesto por WhatsApp' : 'Enviar presupuesto por WhatsApp' }}
+                    Enviar presupuesto por WhatsApp
                   </button>
                 }
               }
@@ -179,8 +194,9 @@ const TIPOS_ITEM: { valor: TipoItem; texto: string }[] = [
                   <p class="suave">Sin celular cargado: no se le pueden mandar avisos.</p>
                 }
               </div>
-              @if (o.cliente.telefono) {
-                <button type="button" class="btn btn-borde" (click)="whatsappManual()">Escribirle por WhatsApp</button>
+              @if (o.whatsapp) {
+                <a class="btn btn-borde" [href]="o.whatsapp[plantillaSugerida()]" target="_blank" rel="noopener"
+                   (click)="avisoAbierto(plantillaSugerida())">Escribirle por WhatsApp</a>
               }
               <a [routerLink]="['/vehiculos', o.vehiculo.id]">Ver historial del vehículo</a>
             </section>
@@ -277,6 +293,14 @@ export class OrdenPagina implements OnInit {
       && ['recibido', 'diagnostico', 'esperando_aprobacion'].includes(o.estado);
   });
 
+  /** El mensaje que corresponde al momento de la orden, para "Escribirle por WhatsApp". */
+  plantillaSugerida = computed<PlantillaWhatsapp>(() => {
+    const estado = this.orden()?.estado;
+    if (estado === 'listo' || estado === 'entregado') return 'listo';
+    if (estado === 'esperando_aprobacion') return 'presupuesto';
+    return 'recibido';
+  });
+
   eventosRecientes = computed(() => [...(this.orden()?.eventos ?? [])].reverse());
 
   ngOnInit() {
@@ -356,26 +380,13 @@ export class OrdenPagina implements OnInit {
     }
   }
 
-  abrirAviso() {
-    const aviso = this.avisoPendiente();
-    if (!aviso) return;
-    abrirWhatsapp(aviso.url);
-    this.api.registrarAviso(this.orden()!.id, aviso.plantilla).then(() => this.cargar()).catch(() => undefined);
+  /**
+   * Se llama al tocar cualquier link de WhatsApp. El link en sí lo abre el navegador
+   * (por eso funciona en iPhone); acá solo se deja registrado en la bitácora.
+   */
+  avisoAbierto(plantilla: PlantillaWhatsapp) {
     this.avisoPendiente.set(null);
-  }
-
-  /** WhatsApp con el mensaje que corresponde al momento de la orden. */
-  async whatsappManual() {
-    const o = this.orden()!;
-    const plantilla: PlantillaWhatsapp =
-      o.estado === 'listo' ? 'listo' : o.estado === 'esperando_aprobacion' ? 'presupuesto' : 'recibido';
-    try {
-      const { whatsapp_url } = await this.api.linkWhatsapp(o.id, plantilla);
-      abrirWhatsapp(whatsapp_url);
-      this.api.registrarAviso(o.id, plantilla).then(() => this.cargar()).catch(() => undefined);
-    } catch (err) {
-      this.error.set(errorDe(err).mensaje);
-    }
+    this.api.registrarAviso(this.orden()!.id, plantilla).then(() => this.cargar()).catch(() => undefined);
   }
 
   async agregarNota() {

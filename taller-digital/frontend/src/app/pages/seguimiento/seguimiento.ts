@@ -1,7 +1,7 @@
 import { Component, OnInit, computed, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Title } from '@angular/platform-browser';
-import { ApiService, abrirWhatsapp, errorDe } from '../../core/api.service';
+import { ApiService, errorDe } from '../../core/api.service';
 import { EstadoOrden, OrdenPublica } from '../../core/modelos';
 import { CantidadPipe, CuandoPipe, ETIQUETA_ESTADO, Patente, PesosPipe, nombreVehiculo } from '../../shared/compartido';
 
@@ -79,8 +79,8 @@ const ORDEN_PASOS: EstadoOrden[] = ['recibido', 'diagnostico', 'esperando_aproba
                     <button type="button" class="btn btn-verde btn-ancho grande" [disabled]="ocupado()" (click)="aprobar()">
                       {{ ocupado() ? 'Aprobando…' : 'Aprobar presupuesto' }}
                     </button>
-                    @if (d.taller.telefono) {
-                      <button type="button" class="btn btn-borde btn-ancho" (click)="consultar()">Tengo una consulta</button>
+                    @if (linkConsulta(); as link) {
+                      <a class="btn btn-borde btn-ancho" [href]="link" target="_blank" rel="noopener">Tengo una consulta</a>
                     }
                     <button type="button" class="btn-texto" (click)="rechazando.set(true)">No lo quiero hacer por ahora</button>
                   } @else {
@@ -236,9 +236,11 @@ export class Seguimiento implements OnInit {
     }
   }
 
-  consultar() {
-    const d = this.datos()!;
+  /** Link a WhatsApp del taller con la consulta ya escrita. */
+  linkConsulta = computed(() => {
+    const d = this.datos();
+    if (!d?.taller.telefono) return null;
     const texto = `Hola, tengo una consulta sobre el presupuesto de la orden n.º ${d.orden.numero}.`;
-    abrirWhatsapp(`https://wa.me/${d.taller.telefono}?text=${encodeURIComponent(texto)}`);
-  }
+    return `https://wa.me/${d.taller.telefono}?text=${encodeURIComponent(texto)}`;
+  });
 }

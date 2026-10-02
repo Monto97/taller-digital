@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { requiereSesion, soloSinSesion } from './core/auth';
+import { requiereSesion, soloAdmin, soloSinSesion } from './core/auth';
 import { Marco } from './layout/marco';
 
 export const routes: Routes = [
@@ -8,12 +8,6 @@ export const routes: Routes = [
     canActivate: [soloSinSesion],
     title: 'Ingresar · Taller Digital',
     loadComponent: () => import('./pages/login/ingresar').then((m) => m.Ingresar),
-  },
-  {
-    path: 'registro',
-    canActivate: [soloSinSesion],
-    title: 'Creá tu taller · Taller Digital',
-    loadComponent: () => import('./pages/registro/registro').then((m) => m.Registro),
   },
   {
     // Link que recibe el cliente por WhatsApp: público, sin login ni menú.
@@ -40,6 +34,12 @@ export const routes: Routes = [
         path: 'ordenes/:id',
         title: 'Orden · Taller Digital',
         loadComponent: () => import('./pages/orden/orden').then((m) => m.OrdenPagina),
+      },
+      {
+        path: 'admin',
+        canActivate: [soloAdmin],
+        title: 'Admin · Taller Digital',
+        loadComponent: () => import('./pages/admin/admin').then((m) => m.Admin),
       },
       {
         path: 'vehiculos/:id',

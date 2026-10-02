@@ -48,6 +48,9 @@ describe('Flujo completo de una orden', () => {
     assert.match(res.body.whatsapp_url, /^https:\/\/wa\.me\/5492215550143\?text=/);
     assert.match(decodeURIComponent(res.body.whatsapp_url), /Hola Laura! Recibimos tu Fiat Cronos AE 482 KT/);
     assert.equal(res.body.eventos[0].tipo, 'creada');
+    // Links de WhatsApp listos para usar como links comunes en el front
+    assert.match(res.body.whatsapp.presupuesto, /^https:\/\/wa\.me\/5492215550143\?text=/);
+    assert.match(res.body.whatsapp.listo, /^https:\/\/wa\.me\//);
   });
 
   test('la segunda orden del taller toma el número 2, y la del otro taller el 1', async () => {
@@ -164,6 +167,7 @@ describe('Listado, notas, WhatsApp y aislamiento entre talleres', () => {
     });
     ordenId = res.body.id;
     assert.equal(res.body.whatsapp_url, null); // sin teléfono no hay link
+    assert.equal(res.body.whatsapp, null);
   });
 
   test('filtra activas, por estado y por texto', async () => {

@@ -2,7 +2,7 @@ const bcrypt = require('bcryptjs');
 const { pool, withTransaction } = require('../../db/pool');
 const AppError = require('../../utils/AppError');
 const { slugify, normalizarTelefono } = require('../../utils/formato');
-const { firmarToken } = require('../../middlewares/auth');
+const { firmarToken, esAdmin } = require('../../middlewares/auth');
 
 const BCRYPT_ROUNDS = 12;
 // Hash de relleno: se compara igual cuando el email no existe, para no revelar
@@ -12,7 +12,7 @@ const HASH_FALSO = bcrypt.hashSync('contraseña-que-no-existe', BCRYPT_ROUNDS);
 function armarRespuesta(usuario, taller) {
   return {
     token: firmarToken(usuario),
-    usuario: { id: usuario.id, nombre: usuario.nombre, email: usuario.email, rol: usuario.rol },
+    usuario: { id: usuario.id, nombre: usuario.nombre, email: usuario.email, rol: usuario.rol, admin: esAdmin(usuario.email) },
     taller: { id: taller.id, nombre: taller.nombre, slug: taller.slug },
   };
 }
@@ -99,14 +99,14 @@ async function me({ usuarioId, tallerId }) {
             t.telefono AS taller_telefono, t.direccion AS taller_direccion, t.logo_url AS taller_logo_url
        FROM usuarios u
        JOIN talleres t ON t.id = u.taller_id
-      WHERE u.id = ? AND u.taller_id = ? AND u.activo = 1`,
+      WHERE u.id = ? AND u.taller_id = ? AND u.activo = 1 AND t.activo = 1`,
     [usuarioId, tallerId],
   );
   const f = filas[0];
   if (!f) throw AppError.noAutenticado();
 
   return {
-    usuario: { id: f.id, nombre: f.nombre, email: f.email, rol: f.rol },
+    usuario: { id: f.id, nombre: f.nombre, email: f.email, rol: f.rol, admin: esAdmin(f.email) },
     taller: {
       id: f.taller_id,
       nombre: f.taller_nombre,

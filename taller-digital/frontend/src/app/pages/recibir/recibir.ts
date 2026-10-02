@@ -1,7 +1,7 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { ApiService, DatosNuevaOrden, abrirWhatsapp, errorDe } from '../../core/api.service';
+import { ApiService, DatosNuevaOrden, errorDe } from '../../core/api.service';
 import { Orden, TipoVehiculo, Vehiculo } from '../../core/modelos';
 import { KmPipe, Patente, nombreVehiculo, normalizarPatente } from '../../shared/compartido';
 
@@ -129,9 +129,9 @@ type Paso = 'patente' | 'datos' | 'listo';
               <p class="suave">Orden n.º {{ o.numero }}. Aparece en el tablero como recibido.</p>
 
               @if (o.whatsapp_url) {
-                <button type="button" class="btn btn-whatsapp btn-ancho" (click)="avisar(o)">
+                <a class="btn btn-whatsapp btn-ancho" [href]="o.whatsapp_url" target="_blank" rel="noopener" (click)="avisar(o)">
                   Avisarle a {{ o.cliente.nombre }} por WhatsApp
-                </button>
+                </a>
               }
               <a [routerLink]="['/ordenes', o.id]" class="btn btn-oscuro btn-ancho">Ver la orden</a>
               <button type="button" class="btn-texto" (click)="reiniciar()">Recibir otro vehículo</button>
@@ -248,9 +248,8 @@ export class Recibir implements OnInit {
     }
   }
 
-  async avisar(orden: Orden) {
-    if (!orden.whatsapp_url) return;
-    abrirWhatsapp(orden.whatsapp_url);
+  /** El link lo abre el navegador; acá solo queda registrado en la bitácora. */
+  avisar(orden: Orden) {
     this.api.registrarAviso(orden.id, 'recibido').catch(() => undefined);
   }
 

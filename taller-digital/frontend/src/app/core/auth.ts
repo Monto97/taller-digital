@@ -2,7 +2,7 @@ import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
 import { catchError, throwError } from 'rxjs';
-import { ApiService, DatosRegistro } from './api.service';
+import { ApiService } from './api.service';
 import { Sesion } from './modelos';
 
 const CLAVE = 'taller-digital.sesion';
@@ -17,17 +17,11 @@ export class AuthService {
   readonly usuario = computed(() => this.sesion()?.usuario ?? null);
   readonly taller = computed(() => this.sesion()?.taller ?? null);
   readonly logueado = computed(() => this.sesion() !== null);
+  readonly esAdmin = computed(() => this.sesion()?.usuario.admin === true);
   readonly token = computed(() => this.sesion()?.token ?? null);
 
   async login(email: string, password: string) {
-    this.guardar(await this.api.login(email, password));
-  }
-
-  async registro(datos: DatosRegistro) {
-    this.guardar(await this.api.registro(datos));
-  }
-
-  private guardar(sesion: Sesion) {
+    const sesion = await this.api.login(email, password);
     localStorage.setItem(CLAVE, JSON.stringify(sesion));
     this.sesion.set(sesion);
   }
@@ -66,6 +60,12 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
 export const requiereSesion: CanActivateFn = () => {
   const auth = inject(AuthService);
   return auth.logueado() ? true : inject(Router).createUrlTree(['/ingresar']);
+};
+
+/** El panel de admin es solo para los emails de ADMIN_EMAILS. La API igual lo vuelve a chequear. */
+export const soloAdmin: CanActivateFn = () => {
+  const auth = inject(AuthService);
+  return auth.esAdmin() ? true : inject(Router).createUrlTree(['/']);
 };
 
 /** Si ya tiene sesión, no tiene sentido mostrarle el login. */

@@ -7,12 +7,13 @@ const morgan = require('morgan');
 const env = require('./config/env');
 const { pool } = require('./db/pool');
 const { noEncontrado, manejadorErrores } = require('./middlewares/errores');
-const { requireAuth } = require('./middlewares/auth');
+const { requireAuth, requireAdmin } = require('./middlewares/auth');
 const authRoutes = require('./modules/auth/auth.routes');
 const clientesRoutes = require('./modules/clientes/clientes.routes');
 const vehiculosRoutes = require('./modules/vehiculos/vehiculos.routes');
 const { ordenesRouter, tableroRouter } = require('./modules/ordenes/ordenes.routes');
 const publicoRoutes = require('./modules/publico/publico.routes');
+const adminRoutes = require('./modules/admin/admin.routes');
 
 const app = express();
 
@@ -40,6 +41,7 @@ app.use('/api/vehiculos', requireAuth, vehiculosRoutes);
 app.use('/api/ordenes', requireAuth, ordenesRouter);
 app.use('/api/tablero', requireAuth, tableroRouter);
 app.use('/api/publico', publicoRoutes);
+app.use('/api/admin', requireAuth, requireAdmin, adminRoutes);
 app.use('/api', noEncontrado); // cualquier /api desconocida responde 404 en JSON
 
 // En producción la misma app sirve el frontend de Angular.
@@ -48,7 +50,7 @@ if (env.FRONTEND_DIST && fs.existsSync(env.FRONTEND_DIST)) {
   app.use(express.static(env.FRONTEND_DIST, {
     index: false,
     maxAge: '7d',
-    // El service worker y el manifiesto se revisan en cada visita para que los cambios lleguen enseguida.
+    // El service worker y el manifiesto se revisan en cada visita para tomar los cambios.
     setHeaders: (res, ruta) => {
       if (/(sw\.js|manifest\.webmanifest)$/.test(ruta)) res.set('Cache-Control', 'no-cache');
     },

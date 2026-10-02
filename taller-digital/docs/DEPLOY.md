@@ -51,7 +51,8 @@ Entrá al servicio de la app (no al de MySQL) → pestaña **Variables** y carg�
 | `JWT_SECRET` | Uno nuevo y largo (ver abajo). No uses el de tu PC. |
 | `PUBLIC_APP_URL` | La URL pública de la app (paso 4). |
 | `CORS_ORIGIN` | La misma URL pública. |
-| `REGISTRO_CLAVE` | Una clave tuya de 12 caracteres o más, para crear talleres (paso 5). |
+| `REGISTRO_CLAVE` | Una clave tuya de 12 caracteres o más, para crear tu primer taller (paso 5). |
+| `ADMIN_EMAILS` | Tu email (el del usuario con el que vas a entrar). Te da acceso al panel de admin. |
 
 Los valores con `${{MySQL...}}` son referencias: Railway completa solo los datos de la base. Si tu servicio de base no se llama `MySQL`, cambiá esa parte por su nombre.
 
@@ -71,7 +72,10 @@ Volvé a **Variables** y poné esa URL (sin `/` al final) en `PUBLIC_APP_URL` y 
 
 Cada cambio de variables vuelve a desplegar la app. Cuando termine, entrá a `https://TU-URL/api/salud`: tiene que decir `{"estado":"ok"}`. En los logs del deploy vas a ver `Tablas creadas en "railway"`.
 
-## 5. Crear el taller de tu cliente
+## 5. Crear tu usuario y el taller de tu cliente
+
+La primera vez no hay nadie con acceso, así que creás **tu propio taller** (por ejemplo, "Taller de Prueba") con el email que pusiste en `ADMIN_EMAILS`, usando `REGISTRO_CLAVE`. A partir de ahí, los talleres de tus clientes los das de alta desde el **panel de admin**, sin comandos (ver más abajo).
+
 
 En producción el registro está cerrado. Solo se abre si mandás la `REGISTRO_CLAVE` en un header. Desde PowerShell en tu PC:
 
@@ -90,12 +94,25 @@ El teléfono del taller importa: es el que usa el botón "Tengo una consulta" de
 
 Si no vas a crear más talleres por un tiempo, podés borrar `REGISTRO_CLAVE` de las variables y el registro queda cerrado del todo.
 
+## Panel de admin
+
+Entrá con tu usuario (el de `ADMIN_EMAILS`): en el menú aparece **Admin**. Ahí tenés:
+
+- **Métricas generales:** cuántos talleres arrancaron y cuántos lo usan esta semana, órdenes por día, porcentaje de presupuestos aprobados (y cuántos desde el link del cliente), avisos por WhatsApp y monto de trabajos entregados.
+- **Lista de talleres** con su nivel de uso (usándolo, poco uso, dejó de usarlo, sin arrancar), último ingreso y actividad.
+- **Nuevo taller:** lo creás con una contraseña generada y le mandás los datos de ingreso por WhatsApp con un toque.
+- **Deshabilitar** un taller (por ejemplo, si deja de pagar): no puede entrar y se le cierran las sesiones abiertas. Se vuelve a habilitar con un clic, sin perder datos.
+
+Para dar acceso de admin a otra persona, sumá su email a `ADMIN_EMAILS` separado por coma. Para quitárselo, sacalo de la lista: el acceso se corta al instante.
+
 ## 6. Dejarlo en el celular del taller
 
-Abrí la URL en el celular del dueño, ingresá con su usuario y:
+Abrí la URL en el celular del dueño e ingresá con su usuario. Arriba del tablero aparece un aviso para tenerlo como app:
 
-- **Android (Chrome):** menú ⋮ → **Agregar a pantalla de inicio**.
-- **iPhone (Safari):** botón compartir → **Agregar a inicio**.
+- **Android (Chrome):** el aviso tiene un botón **Instalar**. Un toque y queda el ícono.
+- **iPhone (Safari):** Apple no deja poner ese botón, así que el aviso explica el camino: botón compartir → **Agregar a inicio**.
+
+Si tocan "Ahora no", el aviso vuelve a aparecer a la semana. También se puede instalar en cualquier momento desde el menú del navegador.
 
 Queda un ícono como el de cualquier app y se abre a pantalla completa.
 

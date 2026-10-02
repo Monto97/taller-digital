@@ -243,16 +243,32 @@ async function obtener(tallerId, id) {
     `SELECT o.*,
             v.patente, v.tipo, v.marca, v.modelo, v.anio, v.km_actual,
             c.nombre AS cliente_nombre, c.telefono AS cliente_telefono,
-            u.nombre AS mecanico_nombre
+            u.nombre AS mecanico_nombre,
+            t.nombre AS taller_nombre
        FROM ordenes o
        JOIN vehiculos v ON v.id = o.vehiculo_id
        JOIN clientes c ON c.id = o.cliente_id
+       JOIN talleres t ON t.id = o.taller_id
        LEFT JOIN usuarios u ON u.id = o.mecanico_id
       WHERE o.id = ? AND o.taller_id = ?`,
     [id, tallerId],
   );
   const o = filas[0];
   if (!o) throw AppError.noEncontrado('La orden');
+
+  // Links de WhatsApp ya armados: el front los usa como links comunes,
+  // que ningún navegador bloquea (a diferencia de abrir una ventana por código).
+  const datosMensaje = {
+    numero: o.numero,
+    total: o.total,
+    token_publico: o.token_publico,
+    cliente: { nombre: o.cliente_nombre, telefono: o.cliente_telefono },
+    vehiculo: { marca: o.marca, modelo: o.modelo, patente: o.patente, tipo: o.tipo },
+    taller: { nombre: o.taller_nombre },
+  };
+  const whatsappLinks = o.cliente_telefono
+    ? Object.fromEntries(['recibido', 'presupuesto', 'listo'].map((p) => [p, armarWhatsapp(datosMensaje, p)]))
+    : null;
 
   const [items] = await pool.query(
     `SELECT id, tipo, descripcion, cantidad, precio_unitario,
@@ -290,6 +306,7 @@ async function obtener(tallerId, id) {
     fecha_estimada_entrega: o.fecha_estimada_entrega,
     fecha_entrega: o.fecha_entrega,
     link_publico: whatsapp.linkPublico(o.token_publico),
+    whatsapp: whatsappLinks,
     vehiculo: {
       id: o.vehiculo_id, patente: o.patente, tipo: o.tipo, marca: o.marca, modelo: o.modelo, anio: o.anio, km_actual: o.km_actual,
     },

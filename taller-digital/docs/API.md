@@ -2,7 +2,7 @@
 
 API REST en JSON. Base URL en desarrollo: `http://localhost:3000/api`.
 
-**Estado de implementación:** ✅ Salud, Auth, Clientes, Vehículos, Órdenes, Tablero y Público. Pendiente: Taller y usuarios, y Servicios programados.
+**Estado de implementación:** ✅ Salud, Auth, Clientes, Vehículos, Órdenes, Tablero, Público y Admin. Pendiente: Taller y usuarios, y Servicios programados.
 
 ## Convenciones
 
@@ -29,9 +29,11 @@ API REST en JSON. Base URL en desarrollo: `http://localhost:3000/api`.
 | 401 | `NO_AUTENTICADO` | Falta el token o expiró. |
 | 401 | `CREDENCIALES_INVALIDAS` | Email o contraseña incorrectos (no se distingue cuál, a propósito). |
 | 403 | `CUENTA_INACTIVA` | El usuario o el taller están desactivados. |
+| 403 | `REGISTRO_CERRADO` | El registro de talleres no está habilitado o falta el header `X-Clave-Registro`. |
 | 403 | `SIN_PERMISO` | El rol no alcanza para esa acción. |
 | 404 | `NO_ENCONTRADO` | No existe o pertenece a otro taller (no se distingue a propósito). |
 | 409 | `EMAIL_EN_USO` | Ya existe una cuenta con ese email. |
+| 409 | `PROPIO_TALLER` | El admin intenta deshabilitar su propio taller. |
 | 409 | `PATENTE_DUPLICADA` | Ya hay un vehículo con esa patente en el taller. Incluye `detalles.vehiculo_id` para que el front ofrezca abrirlo. |
 | 409 | `CLIENTE_CON_VEHICULOS` | Se intenta eliminar un cliente que todavía tiene vehículos a su nombre. |
 | 409 | `TRANSICION_INVALIDA` | El cambio de estado no está permitido. |
@@ -60,7 +62,11 @@ Chequea que la API y la base respondan: `{ "estado": "ok" }`. Sirve para el heal
 ## Auth
 
 ### `POST /auth/registro`
-Crea un taller y su usuario dueño. Es abierto: lo usa la pantalla `/registro` del front para que cada taller cree su cuenta. Tiene el mismo límite de intentos que el login.
+Crea un taller y su usuario dueño. Lo usás vos para dar de alta talleres, no los usuarios finales:
+
+- Si el backend tiene `REGISTRO_CLAVE`, hay que mandar el header `X-Clave-Registro` con ese valor.
+- En producción sin `REGISTRO_CLAVE`, responde `403 REGISTRO_CERRADO`.
+- En desarrollo sin clave queda abierto.
 
 También se puede crear un taller con `npm run crear-taller` desde `backend/`.
 
@@ -291,3 +297,49 @@ Aprueba el presupuesto. Solo funciona con el presupuesto en `enviado` y la orden
 Rechaza el presupuesto, con un motivo opcional: `{ "motivo": "Lo consulto y les aviso" }`. El presupuesto queda `rechazado`, la orden vuelve a `diagnostico` y el taller puede ajustarlo y reenviarlo.
 
 Los endpoints públicos tienen rate limit de 30 requests por minuto por IP, para evitar que se prueben tokens por fuerza bruta. El presupuesto (`presupuesto`) es `null` mientras el taller no lo envió, y `linea_de_tiempo` solo incluye cambios de estado: nunca notas internas, mecánicos ni el teléfono del cliente. El token tiene que ser de 32 caracteres hexadecimales; si no, responde 400.
+
+---
+
+## Admin
+
+Solo para los emails de la variable `ADMIN_EMAILS`. Se verifica contra la base en cada request (no se confía en el token), así sacar un email de la lista corta el acceso al instante. Para cualquier otro usuario responde `403 SIN_PERMISO`. Es la única parte de la API que ve datos de **todos** los talleres.
+
+El login y `/auth/me` devuelven `usuario.admin: true` para estos usuarios, y el front muestra el menú **Admin**.
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| GET | `/admin/resumen` | Métricas generales (ver abajo). |
+| GET | `/admin/talleres` | Todos los talleres con su uso, de los más nuevos a los más viejos. |
+| POST | `/admin/talleres` | Crea un taller con su dueño. Mismo body que `/auth/registro`. |
+| PATCH | `/admin/talleres/:id` | `{ "activo": false }` lo deshabilita: no puede ingresar y sus sesiones abiertas dejan de funcionar. `true` lo vuelve a habilitar. |
+
+### `GET /admin/resumen`
+
+```json
+{
+  "talleres": { "total": 4, "habilitados": 4, "nuevos_30d": 4, "activos_7d": 2, "con_ordenes": 2 },
+  "ordenes": { "total": 7, "ultimos_7d": 7, "ultimos_30d": 7, "entregadas": 1,
+               "monto_entregado": "138500.00", "monto_entregado_30d": "138500.00" },
+  "presupuestos": { "enviados": 2, "aprobados": 1, "rechazados": 0, "aprobados_por_link": 1 },
+  "whatsapp": { "avisos": 0, "avisos_30d": 0 },
+  "base": { "vehiculos": 7, "clientes": 7, "usuarios": 4 },
+  "ordenes_por_dia": [ { "dia": "2026-09-03", "ordenes": 0 }, "... 30 días, el último es hoy" ]
+}
+```
+
+- `activos_7d`: talleres que movieron alguna orden en los últimos 7 días.
+- `con_ordenes`: talleres que cargaron al menos una orden (los que "arrancaron").
+- `aprobados_por_link`: presupuestos que aprobó el cliente desde el link, sin que el taller tenga que llamarlo.
+- Los días de `ordenes_por_dia` son en hora argentina y los días sin órdenes vienen en 0.
+
+### `GET /admin/talleres`
+
+Cada taller incluye su dueño (`dueno_nombre`, `dueno_email`), `ordenes`, `ordenes_7d`, `en_taller`, `vehiculos`, `monto_entregado`, `ultimo_ingreso`, `ultima_actividad` y `uso`:
+
+| `uso` | Significa |
+|---|---|
+| `activo` | Movió órdenes en los últimos 3 días. |
+| `poco_uso` | Su última actividad fue hace entre 4 y 14 días. |
+| `inactivo` | Más de 14 días sin actividad. |
+| `sin_arrancar` | Todavía no cargó ninguna orden. |
+

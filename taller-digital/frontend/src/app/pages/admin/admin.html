@@ -1,0 +1,193 @@
+<div class="contenedor">
+  <div class="encabezado">
+    <div>
+      <h1>Panel de admin</h1>
+      <p class="suave">Todos los talleres que usan el sistema.</p>
+    </div>
+    <button type="button" class="btn btn-primario" (click)="abrirAlta()">Nuevo taller</button>
+  </div>
+
+  @if (error()) { <p class="aviso aviso-error" role="alert">{{ error() }}</p> }
+
+  <!-- Alta de taller -->
+  @if (mostrarAlta()) {
+    <form class="panel alta" (ngSubmit)="crear()">
+      <h2>Nuevo taller</h2>
+      <div class="fila fila-2">
+        <div class="campo">
+          <label for="a-taller">Nombre del taller</label>
+          <input id="a-taller" name="taller" class="input" placeholder="Taller Rodríguez" [(ngModel)]="alta.taller" />
+        </div>
+        <div class="campo">
+          <label for="a-tel">Celular del taller</label>
+          <input id="a-tel" name="telefono" class="input" type="tel" placeholder="2241 15 68-9216" [(ngModel)]="alta.telefono" />
+          <span class="ayuda">Lo usan sus clientes para consultarle desde el link.</span>
+        </div>
+      </div>
+      <div class="campo">
+        <label for="a-dir">Dirección</label>
+        <input id="a-dir" name="direccion" class="input" placeholder="Av. Lastra 1234, Chascomús" [(ngModel)]="alta.direccion" />
+      </div>
+      <div class="fila fila-2">
+        <div class="campo">
+          <label for="a-dueno">Nombre del dueño</label>
+          <input id="a-dueno" name="dueno" class="input" [(ngModel)]="alta.dueno" />
+        </div>
+        <div class="campo">
+          <label for="a-email">Email del dueño</label>
+          <input id="a-email" name="email" class="input" type="email" autocomplete="off" [(ngModel)]="alta.email" />
+        </div>
+      </div>
+      <div class="campo clave">
+        <label for="a-clave">Contraseña inicial</label>
+        <div class="con-boton">
+          <input id="a-clave" name="clave" class="input" autocomplete="off" [(ngModel)]="alta.clave" />
+          <button type="button" class="btn btn-borde" (click)="nuevaClave()">Generar otra</button>
+        </div>
+      </div>
+
+      @if (errorAlta()) { <p class="aviso aviso-error" role="alert">{{ errorAlta() }}</p> }
+
+      <div class="acciones">
+        <button type="submit" class="btn btn-primario" [disabled]="!puedeCrear() || ocupado()">
+          {{ ocupado() ? 'Creando…' : 'Crear taller' }}
+        </button>
+        <button type="button" class="btn-texto" (click)="mostrarAlta.set(false)">Cancelar</button>
+      </div>
+    </form>
+  }
+
+  <!-- Datos para mandarle al taller recién creado -->
+  @if (creado(); as c) {
+    <div class="panel creado">
+      <h2>Listo: {{ c.nombre }} ya puede entrar</h2>
+      <pre class="mensaje">{{ mensajeBienvenida() }}</pre>
+      <div class="acciones">
+        @if (linkBienvenida(); as link) {
+          <a class="btn btn-whatsapp" [href]="link" target="_blank" rel="noopener">Mandarle los datos por WhatsApp</a>
+        }
+        <button type="button" class="btn btn-borde" (click)="copiarBienvenida()">Copiar mensaje</button>
+        <button type="button" class="btn-texto" (click)="creado.set(null)">Cerrar</button>
+      </div>
+    </div>
+  }
+
+  @if (resumen(); as r) {
+    <!-- Métricas -->
+    <section class="metricas" aria-label="Métricas generales">
+      <div class="metrica">
+        <span class="etiqueta">Talleres</span>
+        <strong>{{ r.talleres.total }}</strong>
+        <span class="detalle">{{ r.talleres.activos_7d }} usándolo esta semana · {{ r.talleres.nuevos_30d }} nuevos en 30 días</span>
+      </div>
+      <div class="metrica">
+        <span class="etiqueta">Arrancaron</span>
+        <strong>{{ r.talleres.con_ordenes }}<small>/{{ r.talleres.total }}</small></strong>
+        <span class="detalle">cargaron al menos una orden</span>
+      </div>
+      <div class="metrica">
+        <span class="etiqueta">Órdenes</span>
+        <strong>{{ r.ordenes.total }}</strong>
+        <span class="detalle">{{ r.ordenes.ultimos_7d }} esta semana · {{ r.ordenes.ultimos_30d }} en 30 días</span>
+      </div>
+      <div class="metrica">
+        <span class="etiqueta">Presupuestos aprobados</span>
+        <strong>@if (tasaAprobacion() !== null) { {{ tasaAprobacion() }}% } @else { – }</strong>
+        <span class="detalle">
+          {{ r.presupuestos.aprobados }} de {{ r.presupuestos.enviados }} enviados
+          @if (tasaPorLink() !== null) { · {{ tasaPorLink() }}% desde el link }
+        </span>
+      </div>
+      <div class="metrica">
+        <span class="etiqueta">Avisos por WhatsApp</span>
+        <strong>{{ r.whatsapp.avisos }}</strong>
+        <span class="detalle">{{ r.whatsapp.avisos_30d }} en los últimos 30 días</span>
+      </div>
+      <div class="metrica">
+        <span class="etiqueta">Trabajos entregados</span>
+        <strong class="monto">{{ r.ordenes.monto_entregado | pesos }}</strong>
+        <span class="detalle">{{ r.ordenes.entregadas }} {{ r.ordenes.entregadas === 1 ? 'orden' : 'órdenes' }} · {{ r.ordenes.monto_entregado_30d | pesos }} en 30 días</span>
+      </div>
+    </section>
+
+    <!-- Órdenes por día -->
+    <section class="panel" aria-labelledby="t-grafico">
+      <div class="titulo-fila">
+        <h2 id="t-grafico">Órdenes por día</h2>
+        <span class="suave">últimos 30 días · {{ r.base.vehiculos }} vehículos y {{ r.base.clientes }} clientes cargados</span>
+      </div>
+      <div class="grafico" role="img" [attr.aria-label]="'Órdenes por día: ' + r.ordenes.ultimos_30d + ' en 30 días'">
+        @for (d of r.ordenes_por_dia; track d.dia; let i = $index) {
+          <div class="barra" [title]="etiquetaDia(d.dia) + ': ' + d.ordenes + (d.ordenes === 1 ? ' orden' : ' órdenes')">
+            <span class="relleno" [style.height]="altura(d.ordenes)" [class.vacia]="d.ordenes === 0"></span>
+            @if (i % 5 === 4 || i === 0) { <span class="dia">{{ etiquetaDia(d.dia) }}</span> }
+          </div>
+        }
+      </div>
+    </section>
+  } @else if (!error()) {
+    <p class="cargando">Cargando métricas…</p>
+  }
+
+  <!-- Talleres -->
+  @if (resumen()) {
+    <section class="panel" aria-labelledby="t-talleres">
+      <h2 id="t-talleres">Talleres</h2>
+      @if (talleres().length === 0) {
+        <p class="suave">Todavía no hay talleres. Creá el primero con "Nuevo taller".</p>
+      } @else {
+        <div class="tabla-scroll">
+          <table class="tabla">
+            <thead>
+              <tr>
+                <th>Taller</th>
+                <th>Uso</th>
+                <th class="num">Órdenes</th>
+                <th class="num">En taller</th>
+                <th class="num">Vehículos</th>
+                <th class="num">Entregado</th>
+                <th>Último ingreso</th>
+                <th>Alta</th>
+                <th><span class="oculto">Acciones</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (t of talleres(); track t.id) {
+                <tr [class.deshabilitado]="!t.activo">
+                  <td data-titulo="Taller">
+                    <strong>{{ t.nombre }}</strong>
+                    <span class="suave sub">{{ t.dueno_nombre }} · {{ t.dueno_email }}</span>
+                    @if (t.telefono) { <a class="sub" [href]="'https://wa.me/' + t.telefono" target="_blank" rel="noopener">WhatsApp</a> }
+                  </td>
+                  <td data-titulo="Uso">
+                    @if (!t.activo) {
+                      <span class="uso uso-deshabilitado">Deshabilitado</span>
+                    } @else {
+                      <span class="uso uso-{{ t.uso }}" [title]="uso[t.uso].ayuda">{{ uso[t.uso].texto }}</span>
+                    }
+                    @if (t.ultima_actividad) { <span class="suave sub">{{ t.ultima_actividad | cuando }}</span> }
+                  </td>
+                  <td class="num" data-titulo="Órdenes">{{ t.ordenes }} @if (t.ordenes_7d) { <span class="suave sub">+{{ t.ordenes_7d }} esta semana</span> }</td>
+                  <td class="num" data-titulo="En taller">{{ t.en_taller }}</td>
+                  <td class="num" data-titulo="Vehículos">{{ t.vehiculos }}</td>
+                  <td class="num" data-titulo="Entregado">{{ t.monto_entregado | pesos }}</td>
+                  <td data-titulo="Último ingreso">{{ t.ultimo_ingreso ? (t.ultimo_ingreso | cuando) : 'Nunca' }}</td>
+                  <td data-titulo="Alta">{{ t.created_at | cuando: false }}</td>
+                  <td class="accion">
+                    @if (t.id === miTaller()) {
+                      <span class="suave sub">Tu taller</span>
+                    } @else if (t.activo) {
+                      <button type="button" class="btn-peligro" [disabled]="ocupado()" (click)="habilitar(t, false)">Deshabilitar</button>
+                    } @else {
+                      <button type="button" class="btn btn-borde" [disabled]="ocupado()" (click)="habilitar(t, true)">Habilitar</button>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </section>
+  }
+</div>

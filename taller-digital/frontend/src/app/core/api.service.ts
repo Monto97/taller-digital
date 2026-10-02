@@ -2,7 +2,7 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import {
-  ErrorApi, EstadoOrden, Orden, OrdenHistorial, OrdenPublica, PlantillaWhatsapp, Sesion, Tablero, TipoItem, TipoVehiculo, Vehiculo,
+  AdminResumen, AdminTaller, ErrorApi, EstadoOrden, Orden, OrdenHistorial, OrdenPublica, PlantillaWhatsapp, Sesion, Tablero, TipoItem, TipoVehiculo, Vehiculo,
 } from './modelos';
 
 /** En desarrollo el proxy de Angular manda /api al backend (ver proxy.conf.json). */
@@ -16,11 +16,6 @@ export interface DatosNuevoVehiculo {
   cliente_id?: number;
   cliente?: { nombre: string; telefono?: string };
   formato_libre?: boolean;
-}
-
-export interface DatosRegistro {
-  taller: { nombre: string; telefono?: string; direccion?: string };
-  usuario: { nombre: string; email: string; password: string };
 }
 
 export interface DatosNuevaOrden {
@@ -61,9 +56,6 @@ export class ApiService {
   // Auth
   login(email: string, password: string) {
     return this.post<Sesion>('/auth/login', { email, password });
-  }
-  registro(datos: DatosRegistro) {
-    return this.post<Sesion>('/auth/registro', datos);
   }
 
   // Vehículos
@@ -110,6 +102,23 @@ export class ApiService {
   }
   registrarAviso(id: number, plantilla: PlantillaWhatsapp) {
     return this.post<void>(`/ordenes/${id}/whatsapp/registrar`, { plantilla });
+  }
+
+  // Panel de admin (solo ADMIN_EMAILS)
+  adminResumen() {
+    return this.get<AdminResumen>('/admin/resumen');
+  }
+  adminTalleres() {
+    return this.get<AdminTaller[]>('/admin/talleres');
+  }
+  adminCrearTaller(datos: {
+    taller: { nombre: string; telefono?: string; direccion?: string };
+    usuario: { nombre: string; email: string; password: string };
+  }) {
+    return this.post<{ taller: { id: number; nombre: string }; usuario: { email: string } }>('/admin/talleres', datos);
+  }
+  adminHabilitar(id: number, activo: boolean) {
+    return this.patch<AdminTaller>(`/admin/talleres/${id}`, { activo });
   }
 
   // Público (link del cliente, sin login)

@@ -21,6 +21,7 @@
   border: 2px solid var(--whatsapp); background: #effaf3;
 }
 .avisar > div { flex: 1 1 260px; }
+.principal .avisar { padding: 14px; border-radius: 10px; }
 
 /* Estado */
 .estado-actual { font-size: 1.35rem; font-weight: 700; margin-bottom: 6px; }

@@ -1,10 +1,11 @@
 import { Component, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { AuthService } from '../core/auth';
+import { AvisoInstalar } from '../core/instalacion';
 
 @Component({
   selector: 'app-marco',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, AvisoInstalar],
   template: `
     <header class="barra">
       <div class="interior">
@@ -15,13 +16,21 @@ import { AuthService } from '../core/auth';
 
         <nav class="nav" aria-label="Principal">
           <a routerLink="/" routerLinkActive="activo" [routerLinkActiveOptions]="{ exact: true }">Tablero</a>
+          @if (auth.esAdmin()) {
+            <a routerLink="/admin" routerLinkActive="activo">Admin</a>
+          }
         </nav>
 
         <a routerLink="/recibir" class="btn btn-primario recibir">Recibir vehículo</a>
 
+        @if (auth.esAdmin()) {
+          <a routerLink="/admin" class="admin-movil">Admin</a>
+        }
         <button type="button" class="salir" (click)="auth.salir()">Salir</button>
       </div>
     </header>
+
+    <app-aviso-instalar />
 
     <main>
       <router-outlet />
@@ -49,12 +58,14 @@ import { AuthService } from '../core/auth';
     .recibir { min-height: 46px; }
     .salir { background: none; border: 0; color: #c9d1d6; font: 500 .95rem var(--fuente); cursor: pointer; padding: 10px 4px; }
     .salir:hover { color: #fff; }
+    .admin-movil { display: none; color: #c9d1d6; text-decoration: none; font-weight: 500; padding: 10px 4px; }
 
     @media (max-width: 640px) {
       .interior { gap: 10px; flex-wrap: wrap; }
       .nav { display: none; }
       .marca { margin-right: auto; }
       .recibir { order: 3; width: 100%; }
+      .admin-movil { display: inline; }
     }
   `,
 })
