@@ -10,6 +10,12 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/login/ingresar').then((m) => m.Ingresar),
   },
   {
+    path: 'registro',
+    canActivate: [soloSinSesion],
+    title: 'Creá tu taller · Taller Digital',
+    loadComponent: () => import('./pages/registro/registro').then((m) => m.Registro),
+  },
+  {
     // Link que recibe el cliente por WhatsApp: público, sin login ni menú.
     path: 'o/:token',
     title: 'Seguimiento de tu vehículo',

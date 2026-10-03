@@ -2,7 +2,7 @@ import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
 import { catchError, throwError } from 'rxjs';
-import { ApiService } from './api.service';
+import { ApiService, DatosRegistro } from './api.service';
 import { Sesion } from './modelos';
 
 const CLAVE = 'taller-digital.sesion';
@@ -21,7 +21,14 @@ export class AuthService {
   readonly token = computed(() => this.sesion()?.token ?? null);
 
   async login(email: string, password: string) {
-    const sesion = await this.api.login(email, password);
+    this.guardar(await this.api.login(email, password));
+  }
+
+  async registro(datos: DatosRegistro) {
+    this.guardar(await this.api.registro(datos));
+  }
+
+  private guardar(sesion: Sesion) {
     localStorage.setItem(CLAVE, JSON.stringify(sesion));
     this.sesion.set(sesion);
   }

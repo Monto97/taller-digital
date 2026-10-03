@@ -51,7 +51,6 @@ Entrá al servicio de la app (no al de MySQL) → pestaña **Variables** y carg�
 | `JWT_SECRET` | Uno nuevo y largo (ver abajo). No uses el de tu PC. |
 | `PUBLIC_APP_URL` | La URL pública de la app (paso 4). |
 | `CORS_ORIGIN` | La misma URL pública. |
-| `REGISTRO_CLAVE` | Una clave tuya de 12 caracteres o más, para crear tu primer taller (paso 5). |
 | `ADMIN_EMAILS` | Tu email (el del usuario con el que vas a entrar). Te da acceso al panel de admin. |
 
 Los valores con `${{MySQL...}}` son referencias: Railway completa solo los datos de la base. Si tu servicio de base no se llama `MySQL`, cambiá esa parte por su nombre.
@@ -74,25 +73,11 @@ Cada cambio de variables vuelve a desplegar la app. Cuando termine, entrá a `ht
 
 ## 5. Crear tu usuario y el taller de tu cliente
 
-La primera vez no hay nadie con acceso, así que creás **tu propio taller** (por ejemplo, "Taller de Prueba") con el email que pusiste en `ADMIN_EMAILS`, usando `REGISTRO_CLAVE`. A partir de ahí, los talleres de tus clientes los das de alta desde el **panel de admin**, sin comandos (ver más abajo).
+El registro es abierto: entrá a `https://TU-URL/registro` y creá **tu propio taller** (por ejemplo, "Taller de Prueba") con el email que pusiste en `ADMIN_EMAILS`. Ese usuario ve el **panel de admin** (ver más abajo).
 
-
-En producción el registro está cerrado. Solo se abre si mandás la `REGISTRO_CLAVE` en un header. Desde PowerShell en tu PC:
-
-```powershell
-$body = @{
-  taller  = @{ nombre = "Taller Nombre Real"; telefono = "2241 15 00-0000"; direccion = "Calle 123, Chascomús" }
-  usuario = @{ nombre = "Nombre del dueño"; email = "dueno@mail.com"; password = "una-clave-para-el" }
-} | ConvertTo-Json
-
-Invoke-RestMethod -Method Post -Uri https://TU-URL/api/auth/registro `
-  -Headers @{ "X-Clave-Registro" = "TU-REGISTRO_CLAVE" } `
-  -ContentType "application/json; charset=utf-8" -Body ([System.Text.Encoding]::UTF8.GetBytes($body))
-```
+A tus clientes les pasás el mismo link `https://TU-URL/registro` y crean su taller solos (también se llega desde "Creá tu taller" en la pantalla de ingreso). Si preferís, también los podés dar de alta vos desde el panel de admin.
 
 El teléfono del taller importa: es el que usa el botón "Tengo una consulta" del link que recibe el cliente.
-
-Si no vas a crear más talleres por un tiempo, podés borrar `REGISTRO_CLAVE` de las variables y el registro queda cerrado del todo.
 
 ## Panel de admin
 
@@ -135,4 +120,3 @@ Antes de que el taller cargue datos reales, revisá en el servicio de MySQL la p
 | El deploy falla con `Variables de entorno inválidas` | Falta alguna variable o `JWT_SECRET` tiene menos de 32 caracteres. Los logs dicen cuál. |
 | `No se pudo inicializar la base` | Las variables `DB_*` no apuntan al MySQL. Revisá que el nombre del servicio en `${{MySQL...}}` coincida. |
 | Los links de WhatsApp llevan a `localhost` | `PUBLIC_APP_URL` sigue con el valor de desarrollo. |
-| `REGISTRO_CERRADO` al crear el taller | Falta el header o la clave no coincide con `REGISTRO_CLAVE`. |

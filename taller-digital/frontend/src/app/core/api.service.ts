@@ -18,6 +18,11 @@ export interface DatosNuevoVehiculo {
   formato_libre?: boolean;
 }
 
+export interface DatosRegistro {
+  taller: { nombre: string; telefono?: string; direccion?: string };
+  usuario: { nombre: string; email: string; password: string };
+}
+
 export interface DatosNuevaOrden {
   vehiculo_id?: number;
   vehiculo?: DatosNuevoVehiculo;
@@ -56,6 +61,9 @@ export class ApiService {
   // Auth
   login(email: string, password: string) {
     return this.post<Sesion>('/auth/login', { email, password });
+  }
+  registro(datos: DatosRegistro) {
+    return this.post<Sesion>('/auth/registro', datos);
   }
 
   // Vehículos

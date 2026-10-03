@@ -25,9 +25,6 @@ const schema = z.object({
   JWT_EXPIRES_IN: z.string().default('7d'),
   PUBLIC_APP_URL: z.url().default('http://localhost:4200'),
   CORS_ORIGIN: z.string().default('http://localhost:4200'),
-  // Si está definida, POST /auth/registro exige el header X-Clave-Registro con este valor.
-  // En producción, sin esta variable el registro queda cerrado.
-  REGISTRO_CLAVE: z.string().min(12, 'REGISTRO_CLAVE debe tener al menos 12 caracteres').optional(),
   // Carpeta con el build de Angular. Si está definida, la API también sirve el frontend.
   FRONTEND_DIST: z.string().optional(),
   // Emails con acceso al panel de admin (/admin), separados por coma. Es para vos, no para los talleres.
