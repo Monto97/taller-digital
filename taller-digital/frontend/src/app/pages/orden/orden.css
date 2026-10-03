@@ -33,6 +33,8 @@
 
 /* Presupuesto */
 .titulo-fila { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.pdf-acciones { display: flex; gap: 10px; flex-wrap: wrap; }
+.pdf-acciones .btn { flex: 1 1 220px; }
 .items { list-style: none; margin: 0; padding: 0; }
 .items li {
   display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 10px;
@@ -55,6 +57,8 @@
 
 .nuevo-item { padding: 16px; background: var(--fondo); border-radius: var(--radio); }
 .cant-precio { grid-template-columns: 110px 1fr; }
+.km-corto { max-width: 220px; }
+.acciones-form { display: flex; align-items: center; gap: 10px; }
 
 /* Cliente */
 .cliente { font-weight: 600; font-size: 1.05rem; }

@@ -11,7 +11,7 @@ export type EstadoOrden =
 
 export type TipoVehiculo = 'auto' | 'moto';
 export type TipoItem = 'repuesto' | 'mano_de_obra' | 'otro';
-export type PlantillaWhatsapp = 'recibido' | 'presupuesto' | 'listo';
+export type PlantillaWhatsapp = 'recibido' | 'presupuesto' | 'listo' | 'pdf';
 
 export interface Usuario {
   id: number;
@@ -155,6 +155,35 @@ export interface OrdenPublica {
     items: { tipo: TipoItem; descripcion: string; cantidad: string; precio_unitario: string; subtotal: string }[];
   } | null;
   linea_de_tiempo: { estado: EstadoOrden; fecha: string }[];
+}
+
+// ---------- Panel de números del taller ----------
+
+export interface MetricasMes {
+  etiqueta: string;
+  entregadas: number;
+  facturado: string;
+  facturado_mano_obra: string;
+  facturado_repuestos: string;
+  facturado_otros: string;
+  ticket_promedio: string;
+  clientes_atendidos: number;
+  clientes_que_volvieron: number;
+}
+
+export interface PanelNumeros {
+  mes_actual: MetricasMes;
+  mes_anterior: MetricasMes;
+  trabajos_frecuentes: { descripcion: string; cantidad: number }[];
+}
+
+export interface EntregaReciente {
+  id: number;
+  numero: number;
+  total: string;
+  fecha_entrega: string;
+  vehiculo: { patente: string; tipo: TipoVehiculo; marca: string | null; modelo: string | null };
+  cliente: { nombre: string };
 }
 
 // ---------- Panel de admin ----------

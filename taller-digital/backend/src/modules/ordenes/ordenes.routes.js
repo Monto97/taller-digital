@@ -60,6 +60,20 @@ router.post('/:id/whatsapp/registrar', validate({ params: paramsId, body: schema
   res.status(204).end();
 });
 
+// --- Comprobante en PDF ----------------------------------------------------
+const { slugify } = require('../../utils/formato');
+router.get('/:id/pdf', validate({ params: paramsId, query: schemas.tipoPdf }), async (req, res) => {
+  const { buffer, numero, tipo, patente } = await service.pdf(
+    req.auth.tallerId,
+    req.datos.params.id,
+    req.datos.query.tipo,
+  );
+  const nombre = `${tipo}-${numero}-${slugify(patente)}.pdf`;
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `inline; filename="${nombre}"`);
+  res.send(buffer);
+});
+
 // --- Tablero (se monta en /api/tablero) ---
 const tableroRouter = Router();
 tableroRouter.get('/', async (req, res) => {

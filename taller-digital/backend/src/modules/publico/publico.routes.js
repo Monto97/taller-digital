@@ -3,6 +3,7 @@ const { rateLimit } = require('express-rate-limit');
 const { z } = require('zod');
 const validate = require('../../middlewares/validate');
 const { textoOpcional } = require('../../utils/esquemas');
+const { slugify } = require('../../utils/formato');
 const service = require('./publico.service');
 
 // Sin login: el cliente entra con el token del link de WhatsApp.
@@ -24,6 +25,7 @@ const paramsToken = z.object({
   token: z.string().regex(/^[0-9a-f]{32}$/, 'Link inválido.'),
 });
 const rechazo = z.object({ motivo: textoOpcional(500) });
+const tipoPdf = z.object({ tipo: z.enum(['presupuesto', 'comprobante']).optional() });
 
 router.get('/ordenes/:token', validate({ params: paramsToken }), async (req, res) => {
   res.json(await service.obtener(req.datos.params.token));
@@ -35,6 +37,18 @@ router.post('/ordenes/:token/aprobar', validate({ params: paramsToken }), async 
 
 router.post('/ordenes/:token/rechazar', validate({ params: paramsToken, body: rechazo }), async (req, res) => {
   res.json(await service.rechazar(req.datos.params.token, req.datos.body));
+});
+
+// Comprobante en PDF por token (lo que el cliente abre desde WhatsApp).
+router.get('/ordenes/:token/pdf', validate({ params: paramsToken, query: tipoPdf }), async (req, res) => {
+  const { buffer, numero, tipo, patente } = await service.pdfPorToken(
+    req.datos.params.token,
+    req.datos.query.tipo,
+  );
+  const nombre = `${tipo}-${numero}-${slugify(patente)}.pdf`;
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `inline; filename="${nombre}"`);
+  res.send(buffer);
 });
 
 module.exports = router;

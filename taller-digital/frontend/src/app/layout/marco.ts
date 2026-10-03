@@ -16,6 +16,8 @@ import { AvisoInstalar } from '../core/instalacion';
 
         <nav class="nav" aria-label="Principal">
           <a routerLink="/" routerLinkActive="activo" [routerLinkActiveOptions]="{ exact: true }">Tablero</a>
+          <a routerLink="/historial" routerLinkActive="activo">Historial</a>
+          <a routerLink="/numeros" routerLinkActive="activo">Números</a>
           @if (auth.esAdmin()) {
             <a routerLink="/admin" routerLinkActive="activo">Admin</a>
           }
@@ -23,8 +25,10 @@ import { AvisoInstalar } from '../core/instalacion';
 
         <a routerLink="/recibir" class="btn btn-primario recibir">Recibir vehículo</a>
 
+        <a routerLink="/historial" class="nav-movil">Historial</a>
+        <a routerLink="/numeros" class="nav-movil">Números</a>
         @if (auth.esAdmin()) {
-          <a routerLink="/admin" class="admin-movil">Admin</a>
+          <a routerLink="/admin" class="nav-movil">Admin</a>
         }
         <button type="button" class="salir" (click)="auth.salir()">Salir</button>
       </div>
@@ -58,14 +62,14 @@ import { AvisoInstalar } from '../core/instalacion';
     .recibir { min-height: 46px; }
     .salir { background: none; border: 0; color: #c9d1d6; font: 500 .95rem var(--fuente); cursor: pointer; padding: 10px 4px; }
     .salir:hover { color: #fff; }
-    .admin-movil { display: none; color: #c9d1d6; text-decoration: none; font-weight: 500; padding: 10px 4px; }
+    .nav-movil { display: none; color: #c9d1d6; text-decoration: none; font-weight: 500; padding: 10px 4px; }
 
     @media (max-width: 640px) {
       .interior { gap: 10px; flex-wrap: wrap; }
       .nav { display: none; }
       .marca { margin-right: auto; }
       .recibir { order: 3; width: 100%; }
-      .admin-movil { display: inline; }
+      .nav-movil { display: inline; }
     }
   `,
 })

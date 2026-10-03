@@ -6,6 +6,7 @@ const { normalizarPatente } = require('../../utils/formato');
 const whatsapp = require('../../utils/whatsapp');
 const vehiculosService = require('../vehiculos/vehiculos.service');
 const { ESTADOS_ACTIVOS, ESTADOS_CERRADOS, ETIQUETAS, TRANSICIONES, puedeTransicionar } = require('./ordenes.estados');
+const { generarPdf, tipoPorEstado } = require('./orden-pdf');
 
 // ---------------------------------------------------------------------------
 // Helpers internos
@@ -267,7 +268,7 @@ async function obtener(tallerId, id) {
     taller: { nombre: o.taller_nombre },
   };
   const whatsappLinks = o.cliente_telefono
-    ? Object.fromEntries(['recibido', 'presupuesto', 'listo'].map((p) => [p, armarWhatsapp(datosMensaje, p)]))
+    ? Object.fromEntries(['recibido', 'presupuesto', 'listo', 'pdf'].map((p) => [p, armarWhatsapp(datosMensaje, p)]))
     : null;
 
   const [items] = await pool.query(
@@ -481,6 +482,47 @@ async function registrarAviso(auth, id, plantilla) {
   await registrarEvento(pool, id, usuarioId, 'aviso_whatsapp', { detalle: plantilla });
 }
 
+// --- PDF -------------------------------------------------------------------
+
+/**
+ * Comprobante no fiscal: devuelve el PDF listo para mandar por WhatsApp.
+ * `tipo` fuerza el título (presupuesto/comprobante); si no viene, se decide por el estado.
+ */
+async function pdf(tallerId, id, tipo) {
+  const [filas] = await pool.query(
+    `SELECT o.numero, o.motivo, o.diagnostico, o.estado, o.fecha_ingreso,
+            c.nombre AS cliente_nombre, c.telefono AS cliente_telefono,
+            v.patente, v.tipo AS vehiculo_tipo, v.marca, v.modelo, v.anio, v.km_actual,
+            t.nombre AS taller_nombre, t.telefono AS taller_telefono,
+            t.direccion AS taller_direccion, t.logo_url AS taller_logo
+       FROM ordenes o
+       JOIN clientes c ON c.id = o.cliente_id
+       JOIN vehiculos v ON v.id = o.vehiculo_id
+       JOIN talleres t ON t.id = o.taller_id
+      WHERE o.id = ? AND o.taller_id = ?`,
+    [id, tallerId],
+  );
+  const o = filas[0];
+  if (!o) throw AppError.noEncontrado('La orden');
+
+  const [items] = await pool.query(
+    `SELECT tipo, descripcion, cantidad, precio_unitario
+       FROM orden_items WHERE orden_id = ? ORDER BY posicion, id`,
+    [id],
+  );
+
+  const tipoResuelto = tipo ?? tipoPorEstado(o.estado);
+  const buffer = await generarPdf({
+    taller: { nombre: o.taller_nombre, telefono: o.taller_telefono, direccion: o.taller_direccion, logo_url: o.taller_logo },
+    orden: { numero: o.numero, motivo: o.motivo, diagnostico: o.diagnostico, fecha_ingreso: o.fecha_ingreso },
+    cliente: { nombre: o.cliente_nombre, telefono: o.cliente_telefono },
+    vehiculo: { patente: o.patente, tipo: o.vehiculo_tipo, marca: o.marca, modelo: o.modelo, anio: o.anio, km_actual: o.km_actual },
+    items,
+    tipo: tipoResuelto,
+  });
+  return { buffer, numero: o.numero, tipo: tipoResuelto, patente: o.patente };
+}
+
 // --- Tablero ---------------------------------------------------------------
 
 async function tablero(tallerId) {
@@ -539,5 +581,5 @@ async function tablero(tallerId) {
 module.exports = {
   crear, listar, obtener, editar, cambiarEstado, agregarNota,
   agregarItem, editarItem, eliminarItem,
-  enviarPresupuesto, linkWhatsapp, registrarAviso, tablero,
+  enviarPresupuesto, linkWhatsapp, registrarAviso, pdf, tablero,
 };

@@ -2,7 +2,7 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import {
-  AdminResumen, AdminTaller, ErrorApi, EstadoOrden, Orden, OrdenHistorial, OrdenPublica, PlantillaWhatsapp, Sesion, Tablero, TipoItem, TipoVehiculo, Vehiculo,
+  AdminResumen, AdminTaller, ClienteResumen, EntregaReciente, ErrorApi, EstadoOrden, Orden, OrdenHistorial, OrdenPublica, PanelNumeros, PlantillaWhatsapp, Sesion, Tablero, TipoItem, TipoVehiculo, Vehiculo,
 } from './modelos';
 
 /** En desarrollo el proxy de Angular manda /api al backend (ver proxy.conf.json). */
@@ -28,6 +28,27 @@ export interface DatosNuevaOrden {
   vehiculo?: DatosNuevoVehiculo;
   motivo: string;
   km_ingreso?: number | null;
+}
+
+export interface DatosEditarVehiculo {
+  patente?: string;
+  tipo?: TipoVehiculo;
+  marca?: string | null;
+  modelo?: string | null;
+  anio?: number | null;
+  km_actual?: number | null;
+  cliente_id?: number;
+  formato_libre?: boolean;
+}
+
+export interface DatosEditarCliente {
+  nombre?: string;
+  telefono?: string | null;
+}
+
+export interface DatosNuevoCliente {
+  nombre: string;
+  telefono?: string | null;
 }
 
 export interface DatosItem {
@@ -76,10 +97,32 @@ export class ApiService {
   historial(id: number) {
     return this.get<{ vehiculo: Vehiculo; ordenes: OrdenHistorial[] }>(`/vehiculos/${id}/historial`);
   }
+  editarVehiculo(id: number, datos: DatosEditarVehiculo) {
+    return this.patch<Vehiculo>(`/vehiculos/${id}`, datos);
+  }
+
+  // Clientes
+  buscarClientes(q: string) {
+    return this.get<{ datos: ClienteResumen[]; paginacion: { pagina: number; por_pagina: number; total: number } }>(
+      `/clientes?q=${encodeURIComponent(q)}&por_pagina=10`,
+    );
+  }
+  crearCliente(datos: DatosNuevoCliente) {
+    return this.post<ClienteResumen>('/clientes', datos);
+  }
+  editarCliente(id: number, datos: DatosEditarCliente) {
+    return this.patch<ClienteResumen>(`/clientes/${id}`, datos);
+  }
 
   // Órdenes
   tablero() {
     return this.get<Tablero>('/tablero');
+  }
+  numeros() {
+    return this.get<PanelNumeros>('/numeros');
+  }
+  entregasRecientes(dias = 7) {
+    return this.get<EntregaReciente[]>(`/numeros/entregas?dias=${dias}`);
   }
   orden(id: number) {
     return this.get<Orden>(`/ordenes/${id}`);
@@ -110,6 +153,11 @@ export class ApiService {
   }
   registrarAviso(id: number, plantilla: PlantillaWhatsapp) {
     return this.post<void>(`/ordenes/${id}/whatsapp/registrar`, { plantilla });
+  }
+  /** Descarga el comprobante en PDF (el interceptor pone el token). */
+  pdfOrden(id: number, tipo?: 'presupuesto' | 'comprobante') {
+    const q = tipo ? `?tipo=${tipo}` : '';
+    return firstValueFrom(this.http.get(`${API_URL}/ordenes/${id}/pdf${q}`, { responseType: 'blob' }));
   }
 
   // Panel de admin (solo ADMIN_EMAILS)

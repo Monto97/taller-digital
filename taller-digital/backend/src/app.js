@@ -14,6 +14,7 @@ const vehiculosRoutes = require('./modules/vehiculos/vehiculos.routes');
 const { ordenesRouter, tableroRouter } = require('./modules/ordenes/ordenes.routes');
 const publicoRoutes = require('./modules/publico/publico.routes');
 const adminRoutes = require('./modules/admin/admin.routes');
+const numerosRoutes = require('./modules/numeros/numeros.routes');
 
 const app = express();
 
@@ -40,6 +41,7 @@ app.use('/api/clientes', requireAuth, clientesRoutes);
 app.use('/api/vehiculos', requireAuth, vehiculosRoutes);
 app.use('/api/ordenes', requireAuth, ordenesRouter);
 app.use('/api/tablero', requireAuth, tableroRouter);
+app.use('/api/numeros', requireAuth, numerosRoutes);
 app.use('/api/publico', publicoRoutes);
 app.use('/api/admin', requireAuth, requireAdmin, adminRoutes);
 app.use('/api', noEncontrado); // cualquier /api desconocida responde 404 en JSON

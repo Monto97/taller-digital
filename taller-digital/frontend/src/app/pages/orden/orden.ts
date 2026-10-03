@@ -91,8 +91,34 @@ const TIPOS_ITEM: { valor: TipoItem; texto: string }[] = [
 
             <!-- Qué le pasa y diagnóstico -->
             <section class="panel pila" aria-labelledby="t-trabajo">
-              <h2 id="t-trabajo">Qué le pasa</h2>
-              <p>{{ o.motivo }}</p>
+              <div class="titulo-fila">
+                <h2 id="t-trabajo">Qué le pasa</h2>
+                @if (!editandoMotivo()) {
+                  <button type="button" class="btn-texto" (click)="empezarEditarMotivo(o)">Editar</button>
+                }
+              </div>
+
+              @if (!editandoMotivo()) {
+                <p>{{ o.motivo }}</p>
+                @if (o.km_ingreso) {
+                  <p class="suave">Entró con {{ o.km_ingreso | km }}</p>
+                }
+              } @else {
+                <div class="campo">
+                  <label for="motivo-edit">¿Qué le pasa o qué hay que hacerle?</label>
+                  <textarea id="motivo-edit" class="textarea" [(ngModel)]="motivoEditado"></textarea>
+                </div>
+                <div class="campo km-corto">
+                  <label for="km-edit">Kilómetros de ingreso</label>
+                  <input id="km-edit" class="input" type="number" inputmode="numeric" min="0" [(ngModel)]="kmEditado" />
+                </div>
+                <div class="acciones-form">
+                  <button type="button" class="btn btn-oscuro" [disabled]="ocupado() || motivoEditado.trim().length < 3"
+                          (click)="guardarMotivo()">Guardar</button>
+                  <button type="button" class="btn-texto" (click)="editandoMotivo.set(false)">Cancelar</button>
+                </div>
+              }
+
               @if (abierta()) {
                 <div class="campo">
                   <label for="diagnostico">Diagnóstico</label>
@@ -133,6 +159,16 @@ const TIPOS_ITEM: { valor: TipoItem; texto: string }[] = [
                   }
                 </ul>
                 <p class="total"><span>Total</span><span>{{ o.total | pesos }}</span></p>
+
+                <div class="pdf-acciones">
+                  <button type="button" class="btn btn-borde" [disabled]="descargandoPdf()" (click)="descargarPdf()">
+                    {{ descargandoPdf() ? 'Generando…' : textoPdf() }}
+                  </button>
+                  @if (o.whatsapp?.pdf) {
+                    <a class="btn btn-whatsapp" [href]="o.whatsapp!.pdf" target="_blank" rel="noopener"
+                       (click)="avisoAbierto('pdf')">Enviar PDF por WhatsApp</a>
+                  }
+                </div>
               } @else {
                 <p class="suave">Todavía no cargaste repuestos ni mano de obra.</p>
               }
@@ -185,20 +221,44 @@ const TIPOS_ITEM: { valor: TipoItem; texto: string }[] = [
 
           <aside class="lateral">
             <section class="panel pila" aria-labelledby="t-cliente">
-              <h2 id="t-cliente">Cliente</h2>
-              <div>
-                <p class="cliente">{{ o.cliente.nombre }}</p>
-                @if (o.cliente.telefono) {
-                  <a [href]="'tel:+' + o.cliente.telefono">{{ telefonoLegible() }}</a>
-                } @else {
-                  <p class="suave">Sin celular cargado: no se le pueden mandar avisos.</p>
+              <div class="titulo-fila">
+                <h2 id="t-cliente">Cliente</h2>
+                @if (!editandoCliente()) {
+                  <button type="button" class="btn-texto" (click)="empezarEditarCliente(o)">Editar</button>
                 }
               </div>
-              @if (o.whatsapp) {
-                <a class="btn btn-borde" [href]="o.whatsapp[plantillaSugerida()]" target="_blank" rel="noopener"
-                   (click)="avisoAbierto(plantillaSugerida())">Escribirle por WhatsApp</a>
+
+              @if (!editandoCliente()) {
+                <div>
+                  <p class="cliente">{{ o.cliente.nombre }}</p>
+                  @if (o.cliente.telefono) {
+                    <a [href]="'tel:+' + o.cliente.telefono">{{ telefonoLegible() }}</a>
+                  } @else {
+                    <p class="suave">Sin celular cargado: no se le pueden mandar avisos.</p>
+                  }
+                </div>
+                @if (o.whatsapp) {
+                  <a class="btn btn-borde" [href]="o.whatsapp[plantillaSugerida()]" target="_blank" rel="noopener"
+                     (click)="avisoAbierto(plantillaSugerida())">Escribirle por WhatsApp</a>
+                }
+                <a [routerLink]="['/vehiculos', o.vehiculo.id]">Ver historial del vehículo</a>
+              } @else {
+                <div class="campo">
+                  <label for="cli-nombre">Nombre</label>
+                  <input id="cli-nombre" class="input" [(ngModel)]="clienteNombre" />
+                </div>
+                <div class="campo">
+                  <label for="cli-tel">Celular</label>
+                  <input id="cli-tel" class="input" type="tel" inputmode="tel" placeholder="221 555-0143"
+                         [(ngModel)]="clienteTelefono" />
+                  <span class="ayuda">Para avisarle por WhatsApp.</span>
+                </div>
+                <div class="acciones-form">
+                  <button type="button" class="btn btn-oscuro" [disabled]="ocupado() || clienteNombre.trim().length < 2"
+                          (click)="guardarCliente()">Guardar</button>
+                  <button type="button" class="btn-texto" (click)="editandoCliente.set(false)">Cancelar</button>
+                </div>
               }
-              <a [routerLink]="['/vehiculos', o.vehiculo.id]">Ver historial del vehículo</a>
             </section>
 
             <section class="panel pila" aria-labelledby="t-bitacora">
@@ -250,6 +310,22 @@ export class OrdenPagina implements OnInit {
   descItem = '';
   cantItem: number | null = 1;
   precioItem: number | null = null;
+
+  editandoMotivo = signal(false);
+  motivoEditado = '';
+  kmEditado: number | null = null;
+
+  editandoCliente = signal(false);
+  clienteNombre = '';
+  clienteTelefono = '';
+
+  descargandoPdf = signal(false);
+
+  textoPdf = computed(() => {
+    const estado = this.orden()?.estado;
+    const esPresupuesto = estado && ['recibido', 'diagnostico', 'esperando_aprobacion'].includes(estado);
+    return esPresupuesto ? 'Descargar presupuesto (PDF)' : 'Descargar comprobante (PDF)';
+  });
 
   abierta = computed(() => {
     const o = this.orden();
@@ -351,6 +427,58 @@ export class OrdenPagina implements OnInit {
     this.hacer(() => this.api.editarOrden(this.orden()!.id, { diagnostico: this.diagnostico.trim() || null }));
   }
 
+  empezarEditarMotivo(o: Orden) {
+    this.motivoEditado = o.motivo;
+    this.kmEditado = o.km_ingreso;
+    this.editandoMotivo.set(true);
+  }
+
+  async guardarMotivo() {
+    const o = this.orden()!;
+    const cambios: { motivo?: string; km_ingreso?: number | null } = {};
+    const motivo = this.motivoEditado.trim();
+    if (motivo !== o.motivo) cambios.motivo = motivo;
+    const km = this.kmEditado ?? null;
+    if (km !== (o.km_ingreso ?? null)) cambios.km_ingreso = km;
+    if (Object.keys(cambios).length === 0) {
+      this.editandoMotivo.set(false);
+      return;
+    }
+    const actualizada = await this.hacer(() => this.api.editarOrden(o.id, cambios));
+    if (actualizada) this.editandoMotivo.set(false);
+  }
+
+  empezarEditarCliente(o: Orden) {
+    this.clienteNombre = o.cliente.nombre;
+    this.clienteTelefono = o.cliente.telefono ?? '';
+    this.editandoCliente.set(true);
+  }
+
+  async guardarCliente() {
+    const o = this.orden()!;
+    const nombre = this.clienteNombre.trim();
+    const telefono = this.clienteTelefono.trim();
+    const cambios: { nombre?: string; telefono?: string | null } = {};
+    if (nombre !== o.cliente.nombre) cambios.nombre = nombre;
+    const telefonoActual = o.cliente.telefono ?? '';
+    if (telefono !== telefonoActual) cambios.telefono = telefono || null;
+    if (Object.keys(cambios).length === 0) {
+      this.editandoCliente.set(false);
+      return;
+    }
+    this.ocupado.set(true);
+    this.error.set('');
+    try {
+      await this.api.editarCliente(o.cliente.id, cambios);
+      await this.cargar();
+      this.editandoCliente.set(false);
+    } catch (err) {
+      this.error.set(errorDe(err).mensaje);
+    } finally {
+      this.ocupado.set(false);
+    }
+  }
+
   puedeAgregar() {
     return this.descItem.trim().length > 0 && (this.cantItem ?? 0) > 0 && this.precioItem != null && this.precioItem >= 0;
   }
@@ -371,6 +499,24 @@ export class OrdenPagina implements OnInit {
 
   quitarItem(itemId: number) {
     this.hacer(() => this.api.eliminarItem(this.orden()!.id, itemId));
+  }
+
+  async descargarPdf() {
+    const o = this.orden();
+    if (!o) return;
+    this.descargandoPdf.set(true);
+    this.error.set('');
+    try {
+      const blob = await this.api.pdfOrden(o.id);
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank', 'noopener');
+      // Lo liberamos un rato después para que la pestaña nueva lo levante.
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (err) {
+      this.error.set(errorDe(err).mensaje);
+    } finally {
+      this.descargandoPdf.set(false);
+    }
   }
 
   async enviarPresupuesto() {

@@ -1,6 +1,7 @@
 const { pool, withTransaction } = require('../../db/pool');
 const AppError = require('../../utils/AppError');
 const { ETIQUETAS } = require('../ordenes/ordenes.estados');
+const { generarPdf, tipoPorEstado } = require('../ordenes/orden-pdf');
 
 /**
  * Lo que ve el cliente desde el link de WhatsApp. Solo lo necesario:
@@ -144,4 +145,42 @@ async function rechazar(token, { motivo }) {
   return obtener(token);
 }
 
-module.exports = { obtener, aprobar, rechazar };
+/**
+ * PDF del comprobante por token: el mismo que ve el taller, bajable sin login.
+ * El cliente llega acá desde el link que le mandan por WhatsApp.
+ */
+async function pdfPorToken(token, tipo) {
+  const orden = await ordenPorToken(pool, token);
+
+  const [[datos]] = await pool.query(
+    `SELECT o.motivo, o.diagnostico,
+            c.nombre AS cliente_nombre, c.telefono AS cliente_telefono,
+            v.patente, v.tipo AS vehiculo_tipo, v.marca, v.modelo, v.anio, v.km_actual,
+            t.nombre AS taller_nombre, t.telefono AS taller_telefono,
+            t.direccion AS taller_direccion, t.logo_url AS taller_logo
+       FROM ordenes o
+       JOIN clientes c ON c.id = o.cliente_id
+       JOIN vehiculos v ON v.id = o.vehiculo_id
+       JOIN talleres t ON t.id = o.taller_id
+      WHERE o.id = ?`,
+    [orden.id],
+  );
+  const [items] = await pool.query(
+    `SELECT tipo, descripcion, cantidad, precio_unitario
+       FROM orden_items WHERE orden_id = ? ORDER BY posicion, id`,
+    [orden.id],
+  );
+
+  const tipoResuelto = tipo ?? tipoPorEstado(orden.estado);
+  const buffer = await generarPdf({
+    taller: { nombre: datos.taller_nombre, telefono: datos.taller_telefono, direccion: datos.taller_direccion, logo_url: datos.taller_logo },
+    orden: { numero: orden.numero, motivo: datos.motivo, diagnostico: datos.diagnostico, fecha_ingreso: orden.fecha_ingreso },
+    cliente: { nombre: datos.cliente_nombre, telefono: datos.cliente_telefono },
+    vehiculo: { patente: datos.patente, tipo: datos.vehiculo_tipo, marca: datos.marca, modelo: datos.modelo, anio: datos.anio, km_actual: datos.km_actual },
+    items,
+    tipo: tipoResuelto,
+  });
+  return { buffer, numero: orden.numero, tipo: tipoResuelto, patente: datos.patente };
+}
+
+module.exports = { obtener, aprobar, rechazar, pdfPorToken };

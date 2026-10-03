@@ -6,6 +6,11 @@ function linkPublico(token) {
   return `${env.PUBLIC_APP_URL.replace(/\/$/, '')}/o/${token}`;
 }
 
+/** Link directo al PDF del comprobante, también por token. */
+function linkPublicoPdf(token) {
+  return `${env.PUBLIC_APP_URL.replace(/\/$/, '')}/api/publico/ordenes/${token}/pdf`;
+}
+
 /** Link de WhatsApp con el mensaje ya escrito: el taller lo abre y solo toca "enviar". */
 function linkWhatsapp(telefono, texto) {
   return `https://wa.me/${telefono}?text=${encodeURIComponent(texto)}`;
@@ -27,6 +32,10 @@ const PLANTILLAS = {
   listo: (o) =>
     `¡Hola ${primerNombre(o.cliente.nombre)}! Tu ${describir(o.vehiculo)} ya está listo para retirar en ${o.taller.nombre}. ` +
     `Total: ${formatearPesos(o.total)}.\n\nDetalle del trabajo: ${linkPublico(o.token_publico)}`,
+
+  pdf: (o) =>
+    `Hola ${primerNombre(o.cliente.nombre)}, te paso en PDF el detalle del trabajo de tu ${describir(o.vehiculo)}: ` +
+    `${linkPublicoPdf(o.token_publico)}`,
 };
 
 function primerNombre(nombre) {
@@ -42,4 +51,4 @@ function mensaje(plantilla, orden) {
   return PLANTILLAS[plantilla](orden);
 }
 
-module.exports = { linkPublico, linkWhatsapp, mensaje };
+module.exports = { linkPublico, linkPublicoPdf, linkWhatsapp, mensaje };

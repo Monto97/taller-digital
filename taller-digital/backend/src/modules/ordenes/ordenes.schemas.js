@@ -79,7 +79,11 @@ const paramsItem = z.object({
 });
 
 const plantillaWhatsapp = z.object({
-  plantilla: z.enum(['recibido', 'presupuesto', 'listo'], 'Plantilla inválida.'),
+  plantilla: z.enum(['recibido', 'presupuesto', 'listo', 'pdf'], 'Plantilla inválida.'),
 });
 
-module.exports = { crear, editar, cambiarEstado, nota, listar, item, editarItem, paramsItem, plantillaWhatsapp };
+const tipoPdf = z.object({
+  tipo: z.enum(['presupuesto', 'comprobante']).optional(),
+});
+
+module.exports = { crear, editar, cambiarEstado, nota, listar, item, editarItem, paramsItem, plantillaWhatsapp, tipoPdf };
