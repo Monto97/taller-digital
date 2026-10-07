@@ -91,12 +91,12 @@ router.get('/mp/iniciar-pago/:token', validate({ params: paramsToken }), async (
     const motivo = motivos[codigo] || 'error';
     if (motivo === 'error') {
       // eslint-disable-next-line no-console
-      console.error('[mp-iniciar-pago] error', {
+      console.error('[mp-iniciar-pago] error', JSON.stringify({
         token,
         mensaje: err?.message,
         mpStatus: err?.mpStatus,
         mpBody: err?.mpBody,
-      });
+      }, null, 2));
     }
     return res.redirect(302, `${base}/o/${token}?pago=${motivo}`);
   }
