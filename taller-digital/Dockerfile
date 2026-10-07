@@ -29,5 +29,5 @@ USER node
 WORKDIR /app/backend
 EXPOSE 3000
 
-# Crea las tablas si es la primera vez y arranca la API.
-CMD ["sh", "-c", "node scripts/init-db.js && node src/server.js"]
+# Crea las tablas si es la primera vez, aplica migraciones idempotentes y arranca la API.
+CMD ["sh", "-c", "node scripts/init-db.js && node scripts/migrar-pagos.js && node scripts/migrar-mercadopago.js && node scripts/migrar-mp-orders.js && node src/server.js"]
