@@ -1,3 +1,4 @@
+const env = require('../../config/env');
 const { pool } = require('../../db/pool');
 const AppError = require('../../utils/AppError');
 const orders = require('./orders');
@@ -103,25 +104,38 @@ async function iniciarPago(token) {
   const externalReference = `t${orden.taller_id}-o${orden.id}`;
   const descripcion = `Trabajos — Orden ${orden.numero}${orden.patente ? `, ${orden.patente}` : ''}`;
 
-  const respuesta = await orders.crear({
+  const base = env.PUBLIC_APP_URL.replace(/\/$/, '');
+  // El webhook necesita el taller_id para pedir el detalle del pago con el token correcto.
+  // Lo pasamos en el query de la URL de notificación (cada preferencia tiene la suya).
+  const notificationUrl = `${base}/api/publico/mp/webhook?taller=${orden.taller_id}`;
+  const backUrls = {
+    success: `${base}/o/${token}?pago=ok`,
+    failure: `${base}/o/${token}?pago=rechazado`,
+    pending: `${base}/o/${token}?pago=pendiente`,
+  };
+
+  const respuesta = await orders.crearPreferencia({
     accessToken,
     monto: saldo,
     externalReference,
     descripcion,
+    notificationUrl,
+    backUrls,
   });
 
-  const mpOrderId = respuesta.id;
-  const checkoutUrl = respuesta.checkout_url || respuesta.init_point || null;
-  if (!mpOrderId || !checkoutUrl) {
-    const err = new Error('Mercado Pago no devolvió checkout_url. Revisá el panel de MP o la configuración de la app.');
+  const preferenceId = respuesta.id;
+  const checkoutUrl = respuesta.init_point || respuesta.sandbox_init_point || null;
+  if (!preferenceId || !checkoutUrl) {
+    const err = new Error('Mercado Pago no devolvió init_point. Revisá el panel de MP o la configuración de la app.');
     err.mpBody = respuesta;
     throw err;
   }
 
+  // Reusamos la columna mp_order_id para guardar el preference_id (no hace falta migración).
   await pool.query(
     `INSERT INTO orden_pagos_mp (taller_id, orden_id, mp_order_id, external_reference, monto, checkout_url, estado)
      VALUES (?, ?, ?, ?, ?, ?, 'created')`,
-    [orden.taller_id, orden.id, String(mpOrderId), externalReference, saldo, checkoutUrl],
+    [orden.taller_id, orden.id, String(preferenceId), externalReference, saldo, checkoutUrl],
   );
 
   return { checkout_url: checkoutUrl, reusado: false };

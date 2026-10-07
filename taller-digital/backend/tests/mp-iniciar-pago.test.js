@@ -7,7 +7,6 @@ const { pool } = require('../src/db/pool');
 const orders = require('../src/modules/mercadopago/orders');
 
 let A;
-let B;
 let token;
 let ordenId;
 
@@ -28,7 +27,7 @@ async function conectarMp(tallerId, { accessToken = 'APP_USR-test', mpUserId = '
 before(async () => {
   await recrearBase();
   A = await crearTaller(app, 'Taller con MP', 'conmp@taller.com');
-  B = await crearTaller(app, 'Taller sin MP', 'sinmp@taller.com');
+  await crearTaller(app, 'Taller sin MP', 'sinmp@taller.com');
 
   const nueva = await api(A).post('/api/ordenes', {
     vehiculo: { patente: 'MP111AA', marca: 'Fiat', modelo: 'Palio', cliente: { nombre: 'Cliente MP', telefono: '221 555-0199' } },
@@ -46,51 +45,53 @@ describe('Iniciar pago online', () => {
     assert.match(res.headers.location, new RegExp(`/o/${token}\\?pago=no_disponible$`));
   });
 
-  test('con MP conectado, crea la orden en MP y redirige al checkout_url', async (t) => {
+  test('con MP conectado, crea la preferencia y redirige al init_point', async (t) => {
     await conectarMp(A.tallerId);
 
-    const mock = t.mock.method(orders, 'crear', async (args) => {
+    const mock = t.mock.method(orders, 'crearPreferencia', async (args) => {
       assert.equal(args.accessToken, 'APP_USR-test');
       assert.equal(args.monto, 80000);
       assert.equal(args.externalReference, `t${A.tallerId}-o${ordenId}`);
-      return { id: 'MP-ORDER-001', checkout_url: 'https://mp.com/checkout/MP-ORDER-001' };
+      assert.match(args.notificationUrl, new RegExp(`taller=${A.tallerId}$`));
+      assert.match(args.backUrls.success, new RegExp(`/o/${token}\\?pago=ok$`));
+      return { id: 'MP-PREF-001', init_point: 'https://mp.com/checkout/MP-PREF-001' };
     });
 
     const res = await request(app).get(`/api/publico/mp/iniciar-pago/${token}`).expect(302);
-    assert.equal(res.headers.location, 'https://mp.com/checkout/MP-ORDER-001');
+    assert.equal(res.headers.location, 'https://mp.com/checkout/MP-PREF-001');
     assert.equal(mock.mock.callCount(), 1);
 
     const [filas] = await pool.query(
       'SELECT * FROM orden_pagos_mp WHERE orden_id = ? ORDER BY id DESC LIMIT 1',
       [ordenId],
     );
-    assert.equal(filas[0].mp_order_id, 'MP-ORDER-001');
+    assert.equal(filas[0].mp_order_id, 'MP-PREF-001');
     assert.equal(Number(filas[0].monto), 80000);
     assert.equal(filas[0].estado, 'created');
     assert.equal(filas[0].external_reference, `t${A.tallerId}-o${ordenId}`);
   });
 
-  test('un segundo click al toque reusa el checkout_url (no crea otra orden MP)', async (t) => {
-    const mock = t.mock.method(orders, 'crear', async () => {
+  test('un segundo click al toque reusa el checkout_url (no crea otra preferencia)', async (t) => {
+    const mock = t.mock.method(orders, 'crearPreferencia', async () => {
       throw new Error('no debería llamarse');
     });
 
     const res = await request(app).get(`/api/publico/mp/iniciar-pago/${token}`).expect(302);
-    assert.equal(res.headers.location, 'https://mp.com/checkout/MP-ORDER-001');
+    assert.equal(res.headers.location, 'https://mp.com/checkout/MP-PREF-001');
     assert.equal(mock.mock.callCount(), 0);
   });
 
-  test('si cambia el saldo (pago en efectivo intermedio), crea una nueva orden MP', async (t) => {
+  test('si cambia el saldo (pago en efectivo intermedio), crea una nueva preferencia', async (t) => {
     await api(A).post(`/api/ordenes/${ordenId}/pagos`, { monto: 30000, medio: 'efectivo' }).expect(201);
 
-    const mock = t.mock.method(orders, 'crear', async (args) => {
+    const mock = t.mock.method(orders, 'crearPreferencia', async (args) => {
       // Nuevo saldo: 80000 - 30000 = 50000
       assert.equal(args.monto, 50000);
-      return { id: 'MP-ORDER-002', checkout_url: 'https://mp.com/checkout/MP-ORDER-002' };
+      return { id: 'MP-PREF-002', init_point: 'https://mp.com/checkout/MP-PREF-002' };
     });
 
     const res = await request(app).get(`/api/publico/mp/iniciar-pago/${token}`).expect(302);
-    assert.equal(res.headers.location, 'https://mp.com/checkout/MP-ORDER-002');
+    assert.equal(res.headers.location, 'https://mp.com/checkout/MP-PREF-002');
     assert.equal(mock.mock.callCount(), 1);
   });
 
@@ -131,7 +132,7 @@ describe('Iniciar pago online', () => {
     const t3 = otra.body.link_publico.split('/o/')[1];
     await api(A).post(`/api/ordenes/${otra.body.id}/items`, { tipo: 'mano_de_obra', descripcion: 'OK', precio_unitario: 10000 }).expect(201);
 
-    t.mock.method(orders, 'crear', async () => {
+    t.mock.method(orders, 'crearPreferencia', async () => {
       const err = new Error('rechazado');
       err.mpStatus = 400;
       throw err;

@@ -1,11 +1,11 @@
 /**
- * Wrapper fino sobre la Orders API de Mercado Pago.
- *   - crear: POST /v1/orders con el access_token del taller y un X-Idempotency-Key.
- *   - buscarPorReferencia: GET /v1/orders/search?external_reference=... (para verificar manualmente).
- *
- * La forma exacta del body de la Orders API puede cambiar según el país y
- * la fecha; si MP devuelve 400 por un campo, se ajusta acá sin tocar el service.
- * Doc: https://www.mercadopago.com.ar/developers/es/reference/orders/_orders/post
+ * Wrapper fino sobre Checkout Pro (preferences) y Payments de Mercado Pago.
+ *   - crearPreferencia: POST /checkout/preferences con el access_token del taller.
+ *     Devuelve init_point (URL del checkout hosteado) y id (preference_id).
+ *   - obtenerPago: GET /v1/payments/{id} con el access_token del taller.
+ *     Lo usa el webhook para verificar el pago.
+ *   - buscarPagosPorReferencia: GET /v1/payments/search?external_reference=...
+ *     Útil para reconciliar si se perdió una notificación.
  */
 const crypto = require('node:crypto');
 
@@ -35,21 +35,28 @@ async function pedir(url, { accessToken, method = 'GET', body, idempotencyKey } 
 }
 
 /**
- * Crea una orden "online" (checkout hosteado) y devuelve la respuesta cruda.
- * Nos interesa: id, status, checkout_url, external_reference.
+ * Crea una preferencia de Checkout Pro y devuelve la respuesta cruda.
+ * Nos interesa: id (preference_id), init_point (URL del checkout).
  */
-async function crear({ accessToken, monto, externalReference, descripcion }) {
+async function crearPreferencia({ accessToken, monto, externalReference, descripcion, notificationUrl, backUrls }) {
   const body = {
-    type: 'online',
+    items: [
+      {
+        title: descripcion,
+        quantity: 1,
+        unit_price: Number(Number(monto).toFixed(2)),
+        currency_id: 'ARS',
+      },
+    ],
     external_reference: externalReference,
-    total_amount: Number(monto).toFixed(2),
-    processing_mode: 'automatic',
-    description: descripcion,
-    transactions: {
-      payments: [{ amount: Number(monto).toFixed(2) }],
-    },
+    binary_mode: false,
   };
-  return pedir(`${BASE_URL}/v1/orders`, {
+  if (notificationUrl) body.notification_url = notificationUrl;
+  if (backUrls) {
+    body.back_urls = backUrls;
+    body.auto_return = 'approved';
+  }
+  return pedir(`${BASE_URL}/checkout/preferences`, {
     accessToken,
     method: 'POST',
     body,
@@ -57,18 +64,18 @@ async function crear({ accessToken, monto, externalReference, descripcion }) {
   });
 }
 
-/** Devuelve el detalle de una orden ya creada (lo usa el webhook para verificar). */
-function obtener({ accessToken, mpOrderId }) {
-  return pedir(`${BASE_URL}/v1/orders/${encodeURIComponent(mpOrderId)}`, { accessToken });
+/** Trae el detalle de un pago. Lo usa el webhook para validar status y external_reference. */
+function obtenerPago({ accessToken, pagoId }) {
+  return pedir(`${BASE_URL}/v1/payments/${encodeURIComponent(pagoId)}`, { accessToken });
 }
 
 /**
- * Busca por external_reference. Devuelve lo que MP tenga en su base.
+ * Busca pagos por external_reference. Devuelve lo que MP tenga en su base.
  * Útil cuando perdimos una notificación y queremos verificar si una orden se pagó.
  */
-function buscarPorReferencia({ accessToken, externalReference }) {
-  const url = `${BASE_URL}/v1/orders/search?external_reference=${encodeURIComponent(externalReference)}`;
+function buscarPagosPorReferencia({ accessToken, externalReference }) {
+  const url = `${BASE_URL}/v1/payments/search?external_reference=${encodeURIComponent(externalReference)}`;
   return pedir(url, { accessToken });
 }
 
-module.exports = { crear, obtener, buscarPorReferencia };
+module.exports = { crearPreferencia, obtenerPago, buscarPagosPorReferencia };

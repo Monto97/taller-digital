@@ -5,25 +5,30 @@ const orders = require('./orders');
 const ordenesService = require('../ordenes/ordenes.service');
 
 /**
- * Procesa una notificación de Mercado Pago.
+ * Procesa una notificación de Checkout Pro de Mercado Pago.
  *   1. (opcional) Verifica la firma del header `x-signature` con MP_WEBHOOK_SECRET.
- *   2. Busca el intento de pago en nuestra base (orden_pagos_mp) por el mp_order_id.
- *   3. Pide el detalle de la orden a MP con el access_token del taller (así validamos
- *      que la notificación es real: nadie puede inventar un cobro sin que MP tenga la orden).
- *   4. Si está pagada y todavía no la habíamos registrado, crea un orden_pagos
+ *   2. Lee el `taller` del query (lo mandamos nosotros al crear la preferencia)
+ *      para saber con qué access_token hablarle a MP.
+ *   3. Pide el detalle del pago a MP (/v1/payments/{id}) con el access_token del taller.
+ *   4. Busca el intento en nuestra base por preference_id (guardado en orden_pagos_mp.mp_order_id).
+ *   5. Si el pago está aprobado y todavía no lo habíamos registrado, crea un orden_pagos
  *      (medio = mercado_pago) y vincula el pago_id en orden_pagos_mp.
- *   5. Siempre devuelve 200 (así MP no reintenta eternamente); el motivo se loguea.
+ *   6. Devuelve siempre un resumen; la ruta decide el status HTTP.
  */
 
-/** Estados que consideramos "cobrado y acreditado". MP tuvo distintos nombres en el tiempo. */
-const ESTADOS_PAGADOS = new Set(['processed', 'paid', 'approved', 'closed']);
+/** Status de MP que consideramos "cobrado y acreditado" en Checkout Pro. */
+const ESTADOS_PAGADOS = new Set(['approved', 'authorized']);
 
-function extraerOrderId({ body, query }) {
-  // Formatos conocidos: body.data.id (nuevo), body.resource (URL con id), query.id (viejo IPN).
+function extraerPagoId({ body, query }) {
+  // Checkout Pro manda notificaciones en varios formatos según la versión:
+  //   - body.data.id + body.type = "payment"       (webhooks nuevo)
+  //   - body.resource = ".../v1/payments/XXX"       (IPN clásica, URL)
+  //   - query.topic = "payment" + query.id = "XXX" (IPN clásica, query)
+  //   - body.id (raro, legacy)
   const porBody = body?.data?.id ?? body?.id;
   if (porBody) return String(porBody);
   if (typeof body?.resource === 'string') {
-    const match = body.resource.match(/orders\/([^/?#]+)/);
+    const match = body.resource.match(/payments\/([^/?#]+)/);
     if (match) return match[1];
   }
   if (query?.id) return String(query.id);
@@ -52,7 +57,7 @@ function verificarFirma({ signatureHeader, requestId, dataId }) {
   }
 }
 
-async function tallerPorConexion(tallerId) {
+async function tokenDeTaller(tallerId) {
   const [filas] = await pool.query(
     'SELECT access_token FROM taller_mercadopago WHERE taller_id = ?',
     [tallerId],
@@ -60,67 +65,90 @@ async function tallerPorConexion(tallerId) {
   return filas[0] || null;
 }
 
-async function registroPorMpOrderId(mpOrderId) {
+async function registroPorPreferenceId(preferenceId) {
   const [filas] = await pool.query(
     'SELECT * FROM orden_pagos_mp WHERE mp_order_id = ?',
-    [mpOrderId],
+    [preferenceId],
   );
   return filas[0] || null;
 }
 
-function montoDesdeOrden(ordenMp) {
-  // La Orders API puede devolver total_amount o paid_amount (en strings) según el estado.
-  const n = Number(ordenMp.total_amount ?? ordenMp.paid_amount ?? ordenMp?.transactions?.payments?.[0]?.amount);
+async function registroPorReferenciaCreada(externalReference) {
+  // Fallback cuando el pago no tiene preference_id visible: buscamos un intento
+  // "created" para esa external_reference. Priorizamos el más reciente.
+  const [filas] = await pool.query(
+    `SELECT * FROM orden_pagos_mp
+      WHERE external_reference = ? AND estado = 'created' AND pago_id IS NULL
+      ORDER BY created_at DESC
+      LIMIT 1`,
+    [externalReference],
+  );
+  return filas[0] || null;
+}
+
+function montoDesdePago(pagoMp) {
+  const n = Number(pagoMp.transaction_amount ?? pagoMp.transaction_details?.total_paid_amount);
   return Number.isFinite(n) ? n : null;
 }
 
 /**
- * Procesa el webhook. Devuelve un resumen para el log; nunca lanza (los errores quedan ahí).
- * El router responde siempre 200 excepto cuando la firma no verifica (401).
+ * Procesa el webhook. Devuelve un resumen para el log; nunca lanza.
+ * La ruta responde 200 excepto cuando la firma no verifica (401, invita a MP a reintentar).
  */
 async function procesar({ body, query, signatureHeader, requestId }) {
-  const mpOrderId = extraerOrderId({ body, query });
-  if (!mpOrderId) return { resultado: 'sin_order_id' };
+  const pagoIdMp = extraerPagoId({ body, query });
+  if (!pagoIdMp) return { resultado: 'sin_pago_id' };
 
   // Si hay secret cargado, exigimos firma. Si no hay secret, se procesa igual (dev).
-  const firma = verificarFirma({ signatureHeader, requestId, dataId: mpOrderId });
+  const firma = verificarFirma({ signatureHeader, requestId, dataId: pagoIdMp });
   if (firma === false) return { resultado: 'firma_invalida', firmaInvalida: true };
 
-  const registro = await registroPorMpOrderId(mpOrderId);
-  if (!registro) return { resultado: 'desconocido', mpOrderId };
-  if (registro.pago_id) return { resultado: 'ya_registrado', mpOrderId };
+  // Checkout Pro: filtramos las notificaciones que no son de pagos.
+  const tipo = String(body?.type || body?.topic || query?.topic || '').toLowerCase();
+  if (tipo && tipo !== 'payment') return { resultado: 'tipo_ignorado', tipo, pagoIdMp };
 
-  const conexion = await tallerPorConexion(registro.taller_id);
-  if (!conexion) return { resultado: 'taller_desconectado', mpOrderId };
-
-  let ordenMp;
-  try {
-    ordenMp = await orders.obtener({ accessToken: conexion.access_token, mpOrderId });
-  } catch (err) {
-    return { resultado: 'error_consulta_mp', mpOrderId, motivo: err.message };
+  const tallerId = Number(query?.taller);
+  if (!Number.isFinite(tallerId) || tallerId <= 0) {
+    return { resultado: 'sin_taller_en_notification_url', pagoIdMp };
   }
 
-  const estado = String(ordenMp.status || ordenMp.state || '').toLowerCase();
+  const conexion = await tokenDeTaller(tallerId);
+  if (!conexion) return { resultado: 'taller_desconectado', pagoIdMp, tallerId };
+
+  let pagoMp;
+  try {
+    pagoMp = await orders.obtenerPago({ accessToken: conexion.access_token, pagoId: pagoIdMp });
+  } catch (err) {
+    return { resultado: 'error_consulta_mp', pagoIdMp, motivo: err.message };
+  }
+
+  const preferenceId = pagoMp.preference_id || pagoMp.order?.id || null;
+  const externalReference = pagoMp.external_reference || null;
+
+  let registro = null;
+  if (preferenceId) registro = await registroPorPreferenceId(String(preferenceId));
+  if (!registro && externalReference) registro = await registroPorReferenciaCreada(externalReference);
+  if (!registro) return { resultado: 'desconocido', pagoIdMp, preferenceId, externalReference };
+  if (registro.pago_id) return { resultado: 'ya_registrado', pagoIdMp, preferenceId };
+  if (registro.taller_id !== tallerId) return { resultado: 'taller_no_coincide', pagoIdMp, preferenceId };
+
+  const estado = String(pagoMp.status || '').toLowerCase();
   if (!ESTADOS_PAGADOS.has(estado)) {
     await pool.query('UPDATE orden_pagos_mp SET estado = ? WHERE id = ?', [estado || 'desconocido', registro.id]);
-    return { resultado: 'no_pagada', mpOrderId, estadoMp: estado };
+    return { resultado: 'no_pagada', pagoIdMp, estadoMp: estado };
   }
 
-  const montoMp = montoDesdeOrden(ordenMp);
-  if (montoMp == null || Math.abs(montoMp - Number(registro.monto)) > 0.01) {
-    // Igual lo registramos con lo que diga MP (es lo que se cobró), pero avisamos.
-    // (La diferencia podría ocurrir si por algún motivo MP cerró con otro monto.)
-  }
+  const montoMp = montoDesdePago(pagoMp);
   const montoAcreditado = montoMp ?? Number(registro.monto);
 
   let pagoId;
   try {
     pagoId = await ordenesService.registrarPagoDesdeMp(registro.taller_id, registro.orden_id, {
       monto: montoAcreditado,
-      mpOrderId,
+      mpOrderId: String(pagoIdMp),
     });
   } catch (err) {
-    return { resultado: 'error_registro', mpOrderId, motivo: err.message };
+    return { resultado: 'error_registro', pagoIdMp, motivo: err.message };
   }
 
   await pool.query(
@@ -130,7 +158,7 @@ async function procesar({ body, query, signatureHeader, requestId }) {
     [pagoId, registro.id],
   );
 
-  return { resultado: 'registrado', mpOrderId, pagoId, monto: montoAcreditado };
+  return { resultado: 'registrado', pagoIdMp, pagoId, monto: montoAcreditado };
 }
 
-module.exports = { procesar, extraerOrderId, verificarFirma };
+module.exports = { procesar, extraerPagoId, verificarFirma };
