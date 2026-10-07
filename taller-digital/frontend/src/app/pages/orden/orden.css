@@ -60,6 +60,35 @@
 .km-corto { max-width: 220px; }
 .acciones-form { display: flex; align-items: center; gap: 10px; }
 
+/* Pagos */
+.estado-pago {
+  padding: 4px 10px; border-radius: 999px; font-size: .9rem; font-weight: 600;
+  background: var(--fondo); color: var(--texto-suave); border: 1px solid var(--linea);
+}
+.estado-pago.pagado { background: #e7f4ec; color: var(--verde-oscuro); border-color: #bfe0cc; }
+.estado-pago.deuda { background: #fdecea; color: var(--rojo); border-color: #f5c2bd; }
+.pagos { list-style: none; margin: 0; padding: 0; }
+.pagos li {
+  display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px;
+  padding: 11px 0; border-bottom: 1px solid var(--linea);
+}
+.pagos li:first-child { padding-top: 0; }
+.monto-fecha { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+@media (min-width: 640px) {
+  .monto-fecha { grid-template-columns: minmax(180px, 260px) minmax(160px, 200px); }
+}
+.monto-fecha .btn-texto { align-self: flex-start; padding: 0; min-height: 32px; text-align: left; }
+.opciones .opcion { white-space: nowrap; }
+.total-pagos { padding-top: 4px; font-size: 1rem; }
+.total-pagos span:last-child { font: 700 1.2rem var(--fuente-angosta); }
+
+.aviso-saldo {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px;
+  border: 2px solid var(--rojo); background: #fdecea;
+}
+.aviso-saldo > div:first-child { flex: 1 1 260px; }
+.aviso-saldo .acciones { margin-top: 0; }
+
 /* Cliente */
 .cliente { font-weight: 600; font-size: 1.05rem; }
 

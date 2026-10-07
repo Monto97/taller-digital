@@ -2,7 +2,7 @@ import { Component, OnInit, computed, inject, input, signal } from '@angular/cor
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { ApiService, errorDe } from '../../core/api.service';
-import { EstadoOrden, Evento, Orden, PlantillaWhatsapp, TipoItem } from '../../core/modelos';
+import { EstadoOrden, Evento, MedioPago, Orden, Pago, PlantillaWhatsapp, TipoItem } from '../../core/modelos';
 import { CantidadPipe, CuandoPipe, ETIQUETA_ESTADO, KmPipe, Patente, PesosPipe, nombreVehiculo, textoAccion } from '../../shared/compartido';
 
 /** El paso que conviene destacar en cada estado: el botón grande. */
@@ -16,6 +16,14 @@ const SIGUIENTE_PRINCIPAL: Partial<Record<EstadoOrden, EstadoOrden>> = {
 const TIPOS_ITEM: { valor: TipoItem; texto: string }[] = [
   { valor: 'repuesto', texto: 'Repuesto' },
   { valor: 'mano_de_obra', texto: 'Mano de obra' },
+  { valor: 'otro', texto: 'Otro' },
+];
+
+const MEDIOS_PAGO: { valor: MedioPago; texto: string }[] = [
+  { valor: 'efectivo', texto: 'Efectivo' },
+  { valor: 'transferencia', texto: 'Transferencia' },
+  { valor: 'mercado_pago', texto: 'Mercado Pago' },
+  { valor: 'tarjeta', texto: 'Tarjeta' },
   { valor: 'otro', texto: 'Otro' },
 ];
 
@@ -132,6 +140,94 @@ const TIPOS_ITEM: { valor: TipoItem; texto: string }[] = [
                 <div><h3>Diagnóstico</h3><p>{{ o.diagnostico }}</p></div>
               }
             </section>
+
+            <!-- Pagos -->
+            <section class="panel pila" aria-labelledby="t-pagos">
+              <div class="titulo-fila">
+                <h2 id="t-pagos">Pagos</h2>
+                <span class="estado-pago"
+                      [class.pagado]="estaPagado()"
+                      [class.deuda]="debe()">
+                  @if (estaPagado()) { Pagado }
+                  @else if (debe()) { Debe {{ o.saldo | pesos }} }
+                  @else { Sin cobrar }
+                </span>
+              </div>
+
+              @if (pagosActivos().length) {
+                <ul class="pagos">
+                  @for (p of pagosActivos(); track p.id) {
+                    <li>
+                      <div>
+                        <span class="desc">{{ p.medio_etiqueta }} — {{ p.monto | pesos }}</span>
+                        <span class="suave detalle">
+                          {{ p.fecha | cuando }}@if (p.usuario_nombre) {, {{ p.usuario_nombre }}}@if (p.nota) {, {{ p.nota }}}
+                        </span>
+                      </div>
+                      <button type="button" class="quitar" [attr.aria-label]="'Anular ' + p.medio_etiqueta"
+                              [disabled]="ocupado()" (click)="anularPago(p)">×</button>
+                    </li>
+                  }
+                </ul>
+                <p class="total total-pagos">
+                  <span>Cobrado</span><span>{{ o.pagado | pesos }}</span>
+                </p>
+              } @else {
+                <p class="suave">Todavía no se registró ningún cobro.</p>
+              }
+
+              @if (o.estado !== 'cancelada') {
+                @if (!mostrandoFormPago()) {
+                  <button type="button" class="btn btn-oscuro" (click)="abrirFormPago()">Registrar pago</button>
+                } @else {
+                  <form class="nuevo-item pila" (ngSubmit)="registrarPago()">
+                    <div class="opciones" role="group" aria-label="Medio de pago">
+                      @for (m of medios; track m.valor) {
+                        <button type="button" class="opcion" [attr.aria-pressed]="medioPago === m.valor" (click)="medioPago = m.valor">{{ m.texto }}</button>
+                      }
+                    </div>
+                    <div class="fila monto-fecha">
+                      <div class="campo">
+                        <label for="pago-monto">Monto</label>
+                        <input id="pago-monto" name="monto" class="input" type="number" inputmode="decimal" min="0.01" step="any" placeholder="0" [(ngModel)]="montoPago" />
+                        @if (debe()) {
+                          <button type="button" class="btn-texto" (click)="montoPago = +o.saldo">Cobrar saldo ({{ o.saldo | pesos }})</button>
+                        }
+                      </div>
+                      <div class="campo">
+                        <label for="pago-fecha">Fecha</label>
+                        <input id="pago-fecha" name="fecha" class="input" type="date" [(ngModel)]="fechaPago" />
+                      </div>
+                    </div>
+                    <div class="campo">
+                      <label for="pago-nota">Nota (opcional)</label>
+                      <input id="pago-nota" name="nota" class="input" placeholder="Seña para encargar repuestos" [(ngModel)]="notaPago" />
+                    </div>
+                    <div class="acciones-form">
+                      <button type="submit" class="btn btn-oscuro" [disabled]="!puedeCobrar() || ocupado()">Guardar pago</button>
+                      <button type="button" class="btn-texto" (click)="cerrarFormPago()">Cancelar</button>
+                    </div>
+                  </form>
+                }
+              }
+            </section>
+
+            <!-- Confirmación al entregar con saldo pendiente -->
+            @if (saldoAlEntregar(); as s) {
+              <div class="panel aviso-saldo">
+                <div>
+                  <strong>Faltan cobrar {{ s | pesos }}</strong>
+                  <p class="suave">Registrá el pago o confirmá que se entrega igual.</p>
+                </div>
+                <div class="acciones">
+                  <button type="button" class="btn btn-oscuro" [disabled]="ocupado()"
+                          (click)="saldoAlEntregar.set(null); abrirFormPago()">Registrar pago</button>
+                  <button type="button" class="btn-peligro" [disabled]="ocupado()"
+                          (click)="entregarConSaldoPendiente()">Entregar con saldo pendiente</button>
+                  <button type="button" class="btn-texto" (click)="saldoAlEntregar.set(null)">Volver</button>
+                </div>
+              </div>
+            }
 
             <!-- Presupuesto -->
             <section class="panel pila" aria-labelledby="t-presupuesto">
@@ -302,6 +398,7 @@ export class OrdenPagina implements OnInit {
 
   readonly etiqueta = ETIQUETA_ESTADO;
   readonly tipos = TIPOS_ITEM;
+  readonly medios = MEDIOS_PAGO;
   readonly texto = textoAccion;
 
   diagnostico = '';
@@ -310,6 +407,14 @@ export class OrdenPagina implements OnInit {
   descItem = '';
   cantItem: number | null = 1;
   precioItem: number | null = null;
+
+  mostrandoFormPago = signal(false);
+  medioPago: MedioPago = 'efectivo';
+  montoPago: number | null = null;
+  fechaPago = '';
+  notaPago = '';
+  /** Se setea cuando la API rechaza "entregar" por saldo pendiente, para mostrar el panel de confirmación. */
+  saldoAlEntregar = signal<string | null>(null);
 
   editandoMotivo = signal(false);
   motivoEditado = '';
@@ -379,6 +484,14 @@ export class OrdenPagina implements OnInit {
 
   eventosRecientes = computed(() => [...(this.orden()?.eventos ?? [])].reverse());
 
+  pagosActivos = computed<Pago[]>(() => (this.orden()?.pagos ?? []).filter((p) => !p.anulada_at));
+  debe = computed(() => Number(this.orden()?.saldo ?? 0) > 0);
+  estaPagado = computed(() => {
+    const o = this.orden();
+    if (!o) return false;
+    return Number(o.total) > 0 && Number(o.saldo) === 0;
+  });
+
   ngOnInit() {
     this.cargar();
   }
@@ -412,11 +525,31 @@ export class OrdenPagina implements OnInit {
     }
   }
 
-  async mover(estado: EstadoOrden) {
-    const o = await this.hacer(() => this.api.cambiarEstado(this.orden()!.id, estado));
-    if (o?.whatsapp_url && estado === 'listo') {
-      this.avisoPendiente.set({ titulo: `Avisale a ${o.cliente.nombre} que está listo`, url: o.whatsapp_url, plantilla: 'listo' });
+  async mover(estado: EstadoOrden, confirmarSaldoPendiente = false) {
+    this.ocupado.set(true);
+    this.error.set('');
+    try {
+      const o = await this.api.cambiarEstado(this.orden()!.id, estado, { confirmar_saldo_pendiente: confirmarSaldoPendiente });
+      this.mostrar(o);
+      if (estado === 'entregado') this.saldoAlEntregar.set(null);
+      if (o.whatsapp_url && estado === 'listo') {
+        this.avisoPendiente.set({ titulo: `Avisale a ${o.cliente.nombre} que está listo`, url: o.whatsapp_url, plantilla: 'listo' });
+      }
+    } catch (err) {
+      const e = errorDe(err);
+      // Al entregar con saldo pendiente mostramos la confirmación en el panel, no un cartel de error.
+      if (estado === 'entregado' && e.codigo === 'SALDO_PENDIENTE') {
+        this.saldoAlEntregar.set(String(e.detalles?.['saldo'] ?? ''));
+      } else {
+        this.error.set(e.mensaje);
+      }
+    } finally {
+      this.ocupado.set(false);
     }
+  }
+
+  entregarConSaldoPendiente() {
+    this.mover('entregado', true);
   }
 
   cancelar() {
@@ -535,6 +668,47 @@ export class OrdenPagina implements OnInit {
     this.api.registrarAviso(this.orden()!.id, plantilla).then(() => this.cargar()).catch(() => undefined);
   }
 
+  abrirFormPago() {
+    const o = this.orden();
+    this.medioPago = 'efectivo';
+    this.montoPago = o && Number(o.saldo) > 0 ? Number(o.saldo) : null;
+    this.fechaPago = this.hoyIso();
+    this.notaPago = '';
+    this.mostrandoFormPago.set(true);
+  }
+
+  cerrarFormPago() {
+    this.mostrandoFormPago.set(false);
+  }
+
+  puedeCobrar() {
+    return this.montoPago != null && this.montoPago > 0;
+  }
+
+  async registrarPago() {
+    if (!this.puedeCobrar()) return;
+    const o = await this.hacer(() => this.api.registrarPago(this.orden()!.id, {
+      monto: this.montoPago!,
+      medio: this.medioPago,
+      fecha: this.fechaPago || undefined,
+      nota: this.notaPago.trim() || null,
+    }));
+    if (o) this.cerrarFormPago();
+  }
+
+  async anularPago(p: Pago) {
+    if (!confirm(`¿Anular el pago de ${p.medio_etiqueta} por ${p.monto}?`)) return;
+    await this.hacer(() => this.api.anularPago(this.orden()!.id, p.id));
+  }
+
+  private hoyIso() {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
   async agregarNota() {
     const detalle = this.nota.trim();
     if (!detalle) return;
@@ -555,6 +729,8 @@ export class OrdenPagina implements OnInit {
       case 'presupuesto_rechazado': return `El cliente rechazó el presupuesto${e.detalle ? `: ${e.detalle}` : ''}`;
       case 'aviso_whatsapp': return 'Se le avisó por WhatsApp';
       case 'nota': return e.detalle ?? '';
+      case 'pago_registrado': return `Se cobró ${e.detalle ?? ''}`.trim();
+      case 'pago_anulado': return `Se anuló un pago${e.detalle ? `: ${e.detalle}` : ''}`;
     }
   }
 }

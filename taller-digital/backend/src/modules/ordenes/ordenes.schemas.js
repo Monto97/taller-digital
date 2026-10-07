@@ -42,6 +42,28 @@ const editar = z
 const cambiarEstado = z.object({
   estado: z.enum(ESTADOS, 'Estado inválido.'),
   detalle: textoOpcional(500),
+  // Al pasar a "entregado" con saldo pendiente, el back responde 409 SALDO_PENDIENTE.
+  // El front vuelve a mandar la acción con esto en true para confirmar que se entrega igual.
+  confirmar_saldo_pendiente: z.coerce.boolean().optional(),
+});
+
+const MEDIOS_PAGO = ['efectivo', 'transferencia', 'mercado_pago', 'tarjeta', 'otro'];
+
+const pago = z.object({
+  monto: z.coerce.number().positive('El monto tiene que ser mayor a 0.').max(9_999_999_999),
+  medio: z.enum(MEDIOS_PAGO, 'Medio de pago inválido.'),
+  // Si no viene, lo registra con la fecha de ahora.
+  fecha: z.iso.date('Fecha inválida, usá AAAA-MM-DD.').optional(),
+  nota: textoOpcional(500),
+});
+
+const anularPago = z.object({
+  motivo: textoOpcional(500),
+});
+
+const paramsPago = z.object({
+  id: z.coerce.number().int().positive(),
+  pagoId: z.coerce.number().int().positive(),
 });
 
 const nota = z.object({
@@ -86,4 +108,7 @@ const tipoPdf = z.object({
   tipo: z.enum(['presupuesto', 'comprobante']).optional(),
 });
 
-module.exports = { crear, editar, cambiarEstado, nota, listar, item, editarItem, paramsItem, plantillaWhatsapp, tipoPdf };
+module.exports = {
+  crear, editar, cambiarEstado, nota, listar, item, editarItem, paramsItem, plantillaWhatsapp, tipoPdf,
+  pago, anularPago, paramsPago, MEDIOS_PAGO,
+};

@@ -11,6 +11,11 @@ function linkPublicoPdf(token) {
   return `${env.PUBLIC_APP_URL.replace(/\/$/, '')}/api/publico/ordenes/${token}/pdf`;
 }
 
+/** Link para iniciar el cobro online con Mercado Pago. */
+function linkPagoOnline(token) {
+  return `${env.PUBLIC_APP_URL.replace(/\/$/, '')}/api/publico/mp/iniciar-pago/${token}`;
+}
+
 /** Link de WhatsApp con el mensaje ya escrito: el taller lo abre y solo toca "enviar". */
 function linkWhatsapp(telefono, texto) {
   return `https://wa.me/${telefono}?text=${encodeURIComponent(texto)}`;
@@ -29,9 +34,16 @@ const PLANTILLAS = {
     `Hola ${primerNombre(o.cliente.nombre)}, ya tenemos el diagnóstico de tu ${describir(o.vehiculo)}. ` +
     `El presupuesto es de ${formatearPesos(o.total)}.\n\nRevisalo y aprobalo acá: ${linkPublico(o.token_publico)}`,
 
-  listo: (o) =>
-    `¡Hola ${primerNombre(o.cliente.nombre)}! Tu ${describir(o.vehiculo)} ya está listo para retirar en ${o.taller.nombre}. ` +
-    `Total: ${formatearPesos(o.total)}.\n\nDetalle del trabajo: ${linkPublico(o.token_publico)}`,
+  listo: (o) => {
+    const base = `¡Hola ${primerNombre(o.cliente.nombre)}! Tu ${describir(o.vehiculo)} ya está listo para retirar en ${o.taller.nombre}. `
+      + `Total: ${formatearPesos(o.total)}.`;
+    // Si el taller tiene MP conectado y queda saldo, le dejamos el link de pago primero
+    // (es la acción que ahorra tiempo cuando pase a retirarlo).
+    const pago = o.mp_disponible && Number(o.saldo) > 0
+      ? `\n\nPagá online (opcional): ${linkPagoOnline(o.token_publico)}`
+      : '';
+    return `${base}${pago}\n\nDetalle del trabajo: ${linkPublico(o.token_publico)}`;
+  },
 
   pdf: (o) =>
     `Hola ${primerNombre(o.cliente.nombre)}, te paso en PDF el detalle del trabajo de tu ${describir(o.vehiculo)}: ` +

@@ -32,6 +32,16 @@ const schema = z.object({
     .string()
     .default('')
     .transform((v) => v.split(',').map((e) => e.trim().toLowerCase()).filter(Boolean)),
+  // Credenciales de la aplicación de Mercado Pago (una por entorno). Si están vacías,
+  // el módulo de MP responde "no configurado" y no se puede conectar ningún taller.
+  MP_CLIENT_ID: z.string().default(''),
+  MP_CLIENT_SECRET: z.string().default(''),
+  // URL a la que MP devuelve el `code` tras autorizar. Debe estar registrada en el app de MP.
+  // Si no se define, se arma desde PUBLIC_APP_URL.
+  MP_REDIRECT_URI: z.string().default(''),
+  // Secreto para validar la firma del webhook (header x-signature). Si está vacío,
+  // el webhook igual funciona (verifica cada orden contra MP), pero en producción conviene cargarlo.
+  MP_WEBHOOK_SECRET: z.string().default(''),
 });
 
 const parsed = schema.safeParse(process.env);
@@ -41,4 +51,9 @@ if (!parsed.success) {
   process.exit(1);
 }
 
-module.exports = parsed.data;
+const datos = parsed.data;
+if (!datos.MP_REDIRECT_URI) {
+  datos.MP_REDIRECT_URI = `${datos.PUBLIC_APP_URL.replace(/\/$/, '')}/api/mp/oauth/callback`;
+}
+
+module.exports = datos;

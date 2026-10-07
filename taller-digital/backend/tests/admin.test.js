@@ -25,6 +25,7 @@ before(async () => {
   await request(app).post(`/api/publico/ordenes/${o1.body.link_publico.split('/o/')[1]}/aprobar`);
   await post(`/api/ordenes/${o1.body.id}/estado`, { estado: 'listo' });
   await post(`/api/ordenes/${o1.body.id}/whatsapp/registrar`, { plantilla: 'listo' });
+  await post(`/api/ordenes/${o1.body.id}/pagos`, { monto: 200000, medio: 'efectivo' });
   await post(`/api/ordenes/${o1.body.id}/estado`, { estado: 'entregado' });
   await post('/api/ordenes', { vehiculo: { patente: 'AB123CD', cliente: { nombre: 'Juan' } }, motivo: 'Frenos' });
 });

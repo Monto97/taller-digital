@@ -1,6 +1,7 @@
 import { Component, OnInit, computed, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Title } from '@angular/platform-browser';
+import { ActivatedRoute } from '@angular/router';
 import { ApiService, errorDe } from '../../core/api.service';
 import { EstadoOrden, OrdenPublica } from '../../core/modelos';
 import { CantidadPipe, CuandoPipe, ETIQUETA_ESTADO, Patente, PesosPipe, nombreVehiculo } from '../../shared/compartido';
@@ -102,6 +103,29 @@ const ORDEN_PASOS: EstadoOrden[] = ['recibido', 'diagnostico', 'esperando_aproba
             </section>
           }
 
+          @if (d.pago; as pg) {
+            @if (saldoNumero(pg.saldo) > 0) {
+              <section class="tarjeta pila" aria-labelledby="t-pago">
+                <h2 id="t-pago">Pago</h2>
+                @if (saldoNumero(pg.pagado) > 0) {
+                  <p class="suave">Ya pagaste {{ pg.pagado | pesos }} de {{ pg.total | pesos }}.</p>
+                }
+                <p class="total"><span>A pagar</span><span>{{ pg.saldo | pesos }}</span></p>
+                @if (avisoPago(); as a) { <p class="aviso aviso-{{ a.tipo }}" role="status">{{ a.texto }}</p> }
+                @if (pg.mp_disponible) {
+                  <a class="btn btn-primario btn-ancho grande" [href]="linkPago()">Pagar online con Mercado Pago</a>
+                  <p class="suave" style="text-align: center;">Vas al checkout de Mercado Pago. La plata va directo al taller.</p>
+                } @else {
+                  <p class="suave">El taller todavía no habilitó el pago online. Coordiná con ellos cómo abonarlo.</p>
+                }
+              </section>
+            } @else if (pg.total !== '0.00') {
+              <section class="tarjeta pila">
+                <p class="aviso aviso-ok">Esta orden ya está paga. Total: {{ pg.total | pesos }}.</p>
+              </section>
+            }
+          }
+
           @if (d.orden.estado === 'listo') {
             <p class="aviso aviso-ok listo">Tu {{ d.vehiculo.tipo === 'moto' ? 'moto' : 'auto' }} está listo para retirar.</p>
           }
@@ -169,6 +193,7 @@ const ORDEN_PASOS: EstadoOrden[] = ['recibido', 'diagnostico', 'esperando_aproba
 export class Seguimiento implements OnInit {
   private api = inject(ApiService);
   private titulo = inject(Title);
+  private ruta = inject(ActivatedRoute);
 
   token = input.required<string>();
   datos = signal<OrdenPublica | null>(null);
@@ -176,7 +201,10 @@ export class Seguimiento implements OnInit {
   ocupado = signal(false);
   rechazando = signal(false);
   motivo = '';
+  avisoPago = signal<{ tipo: 'ok' | 'error' | 'info'; texto: string } | null>(null);
   readonly nombre = nombreVehiculo;
+  readonly saldoNumero = (v: string) => Number(v);
+  linkPago = computed(() => `/api/publico/mp/iniciar-pago/${this.token()}`);
 
   inicial = computed(() => (this.datos()?.taller.nombre.replace(/^taller\s+/i, '').trim()[0] ?? 'T').toUpperCase());
 
@@ -199,6 +227,18 @@ export class Seguimiento implements OnInit {
   });
 
   async ngOnInit() {
+    // Si volvemos del checkout de MP (/api/publico/mp/iniciar-pago no pudo o la orden ya estaba paga),
+    // mostramos el aviso que coincida.
+    const pago = this.ruta.snapshot.queryParamMap.get('pago');
+    const avisos: Record<string, { tipo: 'ok' | 'error' | 'info'; texto: string }> = {
+      ya_pagada: { tipo: 'ok', texto: 'Esta orden ya está paga.' },
+      no_disponible: { tipo: 'info', texto: 'El taller todavía no habilitó el pago online.' },
+      cancelada: { tipo: 'info', texto: 'La orden está cancelada.' },
+      no_encontrado: { tipo: 'error', texto: 'No encontramos la orden.' },
+      error: { tipo: 'error', texto: 'No pudimos iniciar el pago. Probá de nuevo o pagá en el taller.' },
+    };
+    if (pago && avisos[pago]) this.avisoPago.set(avisos[pago]);
+
     try {
       this.mostrar(await this.api.ordenPublica(this.token()));
     } catch (err) {

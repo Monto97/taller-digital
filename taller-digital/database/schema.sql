@@ -166,7 +166,8 @@ CREATE TABLE orden_eventos (
   orden_id      INT UNSIGNED  NOT NULL,
   usuario_id    INT UNSIGNED  NULL,
   tipo          ENUM('creada','cambio_estado','presupuesto_enviado','presupuesto_aprobado',
-                     'presupuesto_rechazado','aviso_whatsapp','nota') NOT NULL,
+                     'presupuesto_rechazado','aviso_whatsapp','nota',
+                     'pago_registrado','pago_anulado') NOT NULL,
   estado_desde  VARCHAR(30)   NULL,
   estado_hasta  VARCHAR(30)   NULL,
   detalle       VARCHAR(500)  NULL,
@@ -175,6 +176,89 @@ CREATE TABLE orden_eventos (
   KEY idx_eventos_orden (orden_id, created_at),
   CONSTRAINT fk_eventos_orden   FOREIGN KEY (orden_id)   REFERENCES ordenes (id) ON DELETE CASCADE,
   CONSTRAINT fk_eventos_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios (id)
+) ENGINE=InnoDB;
+
+-- ---------------------------------------------------------------------
+-- orden_pagos: cobros parciales o totales de una orden.
+-- Varias filas por orden (señas al recibir el auto, pagos durante
+-- la reparación, saldo al entregar). Para anular un pago se guarda
+-- anulada_at (soft delete) y se deja la fila para que la bitácora
+-- quede completa; el saldo sólo cuenta los pagos con anulada_at = NULL.
+-- ---------------------------------------------------------------------
+CREATE TABLE orden_pagos (
+  id              INT UNSIGNED  NOT NULL AUTO_INCREMENT,
+  taller_id       INT UNSIGNED  NOT NULL,
+  orden_id        INT UNSIGNED  NOT NULL,
+  usuario_id      INT UNSIGNED  NULL COMMENT 'Quien registró el cobro',
+  monto           DECIMAL(12,2) NOT NULL,
+  medio           ENUM('efectivo','transferencia','mercado_pago','tarjeta','otro') NOT NULL,
+  fecha           DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  nota            VARCHAR(500)  NULL,
+  anulada_at      DATETIME      NULL,
+  anulada_por     INT UNSIGNED  NULL,
+  anulada_motivo  VARCHAR(500)  NULL,
+  created_at      DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at      DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_pagos_taller_fecha (taller_id, fecha),
+  KEY idx_pagos_orden        (orden_id, anulada_at),
+  CONSTRAINT fk_pagos_taller  FOREIGN KEY (taller_id)   REFERENCES talleres (id),
+  CONSTRAINT fk_pagos_orden   FOREIGN KEY (orden_id)    REFERENCES ordenes (id) ON DELETE CASCADE,
+  CONSTRAINT fk_pagos_usuario FOREIGN KEY (usuario_id)  REFERENCES usuarios (id),
+  CONSTRAINT fk_pagos_anulada FOREIGN KEY (anulada_por) REFERENCES usuarios (id),
+  CONSTRAINT chk_pagos_monto  CHECK (monto > 0)
+) ENGINE=InnoDB;
+
+-- ---------------------------------------------------------------------
+-- taller_mercadopago: cuenta de Mercado Pago conectada por cada taller.
+-- Una fila por taller (PK = taller_id). access_token y refresh_token
+-- están tal como los devuelve MP: evitamos tocarlos salvo para refrescar.
+-- Al desconectar la cuenta se borra la fila y los links de pago dejan de
+-- aparecer; la plata ya cobrada queda en los pagos de las órdenes.
+-- ---------------------------------------------------------------------
+CREATE TABLE taller_mercadopago (
+  taller_id      INT UNSIGNED  NOT NULL,
+  mp_user_id     VARCHAR(50)   NOT NULL COMMENT 'ID del usuario dueño de la cuenta en MP',
+  access_token   VARCHAR(500)  NOT NULL,
+  refresh_token  VARCHAR(500)  NULL,
+  public_key     VARCHAR(500)  NULL,
+  live_mode      TINYINT(1)    NOT NULL DEFAULT 1 COMMENT '0 = sandbox (credenciales de prueba)',
+  expires_at     DATETIME      NULL COMMENT 'Cuándo caduca el access_token',
+  conectado_at   DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at     DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (taller_id),
+  CONSTRAINT fk_mp_taller FOREIGN KEY (taller_id) REFERENCES talleres (id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- ---------------------------------------------------------------------
+-- orden_pagos_mp: cada intento de cobro online con la Orders API de MP.
+-- Puede haber varias filas por orden (el cliente abandona y vuelve, el
+-- saldo cambia, etc.). Mientras no se concrete, no genera ningún movimiento
+-- en orden_pagos; cuando el webhook confirma el pago, se crea el orden_pagos
+-- y se guarda su id acá en pago_id.
+-- external_reference se mandó a MP para poder reconsultar la orden sin
+-- depender de la base del taller.
+-- ---------------------------------------------------------------------
+CREATE TABLE orden_pagos_mp (
+  id                  INT UNSIGNED  NOT NULL AUTO_INCREMENT,
+  taller_id           INT UNSIGNED  NOT NULL,
+  orden_id            INT UNSIGNED  NOT NULL,
+  mp_order_id         VARCHAR(60)   NOT NULL,
+  external_reference  VARCHAR(80)   NOT NULL,
+  monto               DECIMAL(12,2) NOT NULL,
+  checkout_url        VARCHAR(500)  NULL,
+  estado              VARCHAR(30)   NOT NULL DEFAULT 'created' COMMENT 'created | processed | paid | cancelled | failed',
+  pago_id             INT UNSIGNED  NULL COMMENT 'Se setea cuando el webhook crea el orden_pagos',
+  pagado_at           DATETIME      NULL,
+  created_at          DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at          DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_mp_order_id (mp_order_id),
+  KEY idx_mp_orden (orden_id, created_at),
+  KEY idx_mp_ref (external_reference),
+  CONSTRAINT fk_mpord_taller FOREIGN KEY (taller_id) REFERENCES talleres (id),
+  CONSTRAINT fk_mpord_orden  FOREIGN KEY (orden_id)  REFERENCES ordenes (id) ON DELETE CASCADE,
+  CONSTRAINT fk_mpord_pago   FOREIGN KEY (pago_id)   REFERENCES orden_pagos (id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
 -- ---------------------------------------------------------------------

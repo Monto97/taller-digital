@@ -18,6 +18,7 @@ import { AvisoInstalar } from '../core/instalacion';
           <a routerLink="/" routerLinkActive="activo" [routerLinkActiveOptions]="{ exact: true }">Tablero</a>
           <a routerLink="/historial" routerLinkActive="activo">Historial</a>
           <a routerLink="/numeros" routerLinkActive="activo">Números</a>
+          <a routerLink="/ajustes" routerLinkActive="activo">Ajustes</a>
           @if (auth.esAdmin()) {
             <a routerLink="/admin" routerLinkActive="activo">Admin</a>
           }
@@ -27,6 +28,7 @@ import { AvisoInstalar } from '../core/instalacion';
 
         <a routerLink="/historial" class="nav-movil">Historial</a>
         <a routerLink="/numeros" class="nav-movil">Números</a>
+        <a routerLink="/ajustes" class="nav-movil">Ajustes</a>
         @if (auth.esAdmin()) {
           <a routerLink="/admin" class="nav-movil">Admin</a>
         }

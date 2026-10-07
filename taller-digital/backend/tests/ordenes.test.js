@@ -131,9 +131,18 @@ describe('Flujo completo de una orden', () => {
     assert.equal(res.body.columnas.listo[0].vehiculo, 'Fiat Cronos');
   });
 
-  test('se entrega y queda cerrada', async () => {
+  test('al intentar entregar con saldo pendiente avisa', async () => {
+    const res = await api(A).post(`/api/ordenes/${ordenId}/estado`, { estado: 'entregado' }).expect(409);
+    assert.equal(res.body.error.codigo, 'SALDO_PENDIENTE');
+    assert.equal(res.body.error.detalles.saldo, '423000.00');
+  });
+
+  test('se cobra el total y se entrega', async () => {
+    await api(A).post(`/api/ordenes/${ordenId}/pagos`, { monto: 423000, medio: 'transferencia' }).expect(201);
     const res = await api(A).post(`/api/ordenes/${ordenId}/estado`, { estado: 'entregado' }).expect(200);
     assert.ok(res.body.fecha_entrega);
+    assert.equal(res.body.pagado, '423000.00');
+    assert.equal(res.body.saldo, '0.00');
     assert.deepEqual(res.body.estados_siguientes, []);
 
     const cerrada = await api(A).post(`/api/ordenes/${ordenId}/items`, { tipo: 'otro', descripcion: 'X', precio_unitario: 1 }).expect(409);
@@ -209,5 +218,97 @@ describe('Listado, notas, WhatsApp y aislamiento entre talleres', () => {
     const conItem = await api(A).post(`/api/ordenes/${otra.body.id}/items`, { tipo: 'otro', descripcion: 'Y', precio_unitario: 1 });
     const itemAjeno = conItem.body.items[0].id;
     await api(A).patch(`/api/ordenes/${ordenId}/items/${itemAjeno}`, { precio_unitario: 999 }).expect(404);
+  });
+});
+
+describe('Pagos de la orden', () => {
+  let ordenId;
+  let pagoSenaId;
+
+  before(async () => {
+    const nueva = await api(A).post('/api/ordenes', {
+      vehiculo: { patente: 'FP123GH', marca: 'VW', modelo: 'Gol', cliente: { nombre: 'Marta Flota', telefono: '221 555-0100' } },
+      motivo: 'Service completo',
+    });
+    ordenId = nueva.body.id;
+    await api(A).post(`/api/ordenes/${ordenId}/items`, { tipo: 'repuesto', descripcion: 'Aceite', precio_unitario: 30000 });
+    await api(A).post(`/api/ordenes/${ordenId}/items`, { tipo: 'mano_de_obra', descripcion: 'Mano de obra', precio_unitario: 70000 });
+  });
+
+  test('registra una seña desde el estado "recibido" y actualiza el saldo', async () => {
+    const res = await api(A).post(`/api/ordenes/${ordenId}/pagos`, { monto: 20000, medio: 'efectivo', nota: 'Seña para repuestos' }).expect(201);
+    assert.equal(res.body.pagado, '20000.00');
+    assert.equal(res.body.saldo, '80000.00');
+    assert.equal(res.body.pagos.length, 1);
+    assert.equal(res.body.pagos[0].medio, 'efectivo');
+    assert.equal(res.body.pagos[0].medio_etiqueta, 'Efectivo');
+    pagoSenaId = res.body.pagos[0].id;
+    const bit = res.body.eventos.at(-1);
+    assert.equal(bit.tipo, 'pago_registrado');
+    assert.match(bit.detalle, /Efectivo \$ 20\.000/);
+  });
+
+  test('admite varios pagos y los suma', async () => {
+    const res = await api(A).post(`/api/ordenes/${ordenId}/pagos`, { monto: 50000, medio: 'transferencia' }).expect(201);
+    assert.equal(res.body.pagado, '70000.00');
+    assert.equal(res.body.saldo, '30000.00');
+    assert.equal(res.body.pagos.length, 2);
+  });
+
+  test('rechaza montos inválidos', async () => {
+    const neg = await api(A).post(`/api/ordenes/${ordenId}/pagos`, { monto: -10, medio: 'efectivo' }).expect(400);
+    assert.equal(neg.body.error.codigo, 'VALIDACION');
+    const cero = await api(A).post(`/api/ordenes/${ordenId}/pagos`, { monto: 0, medio: 'efectivo' }).expect(400);
+    assert.equal(cero.body.error.codigo, 'VALIDACION');
+    const medio = await api(A).post(`/api/ordenes/${ordenId}/pagos`, { monto: 100, medio: 'cripto' }).expect(400);
+    assert.equal(medio.body.error.codigo, 'VALIDACION');
+  });
+
+  test('no se puede entregar si queda saldo', async () => {
+    await api(A).post(`/api/ordenes/${ordenId}/estado`, { estado: 'en_reparacion' }).expect(200);
+    await api(A).post(`/api/ordenes/${ordenId}/estado`, { estado: 'listo' }).expect(200);
+    const res = await api(A).post(`/api/ordenes/${ordenId}/estado`, { estado: 'entregado' }).expect(409);
+    assert.equal(res.body.error.codigo, 'SALDO_PENDIENTE');
+    assert.equal(res.body.error.detalles.saldo, '30000.00');
+  });
+
+  test('se puede entregar confirmando que queda saldo', async () => {
+    const res = await api(A).post(`/api/ordenes/${ordenId}/estado`, { estado: 'entregado', confirmar_saldo_pendiente: true }).expect(200);
+    assert.equal(res.body.estado, 'entregado');
+    assert.equal(res.body.saldo, '30000.00');
+    assert.ok(res.body.eventos.some((e) => e.tipo === 'nota' && /saldo pendiente/.test(e.detalle || '')));
+  });
+
+  test('se puede cobrar después de entregada', async () => {
+    const res = await api(A).post(`/api/ordenes/${ordenId}/pagos`, { monto: 30000, medio: 'mercado_pago' }).expect(201);
+    assert.equal(res.body.pagado, '100000.00');
+    assert.equal(res.body.saldo, '0.00');
+  });
+
+  test('anular un pago lo deja marcado y recupera el saldo', async () => {
+    const res = await api(A).del(`/api/ordenes/${ordenId}/pagos/${pagoSenaId}`).send({ motivo: 'Se devolvió al cliente' }).expect(200);
+    assert.equal(res.body.pagado, '80000.00');
+    assert.equal(res.body.saldo, '20000.00');
+    const anulado = res.body.pagos.find((p) => p.id === pagoSenaId);
+    assert.ok(anulado.anulada_at);
+    assert.equal(anulado.anulada_motivo, 'Se devolvió al cliente');
+    assert.ok(res.body.eventos.some((e) => e.tipo === 'pago_anulado'));
+  });
+
+  test('no se puede anular dos veces el mismo pago', async () => {
+    const res = await api(A).del(`/api/ordenes/${ordenId}/pagos/${pagoSenaId}`).expect(409);
+    assert.equal(res.body.error.codigo, 'PAGO_YA_ANULADO');
+  });
+
+  test('otro taller no puede cobrar ni anular pagos ajenos', async () => {
+    await api(B).post(`/api/ordenes/${ordenId}/pagos`, { monto: 1000, medio: 'efectivo' }).expect(404);
+    await api(B).del(`/api/ordenes/${ordenId}/pagos/${pagoSenaId}`).expect(404);
+  });
+
+  test('una orden cancelada no admite pagos', async () => {
+    const nueva = await api(A).post('/api/ordenes', { vehiculo_id: (await api(A).get('/api/vehiculos/patente/FP123GH')).body.id, motivo: 'Chequeo' });
+    await api(A).post(`/api/ordenes/${nueva.body.id}/estado`, { estado: 'cancelada' }).expect(200);
+    const res = await api(A).post(`/api/ordenes/${nueva.body.id}/pagos`, { monto: 100, medio: 'efectivo' }).expect(409);
+    assert.equal(res.body.error.codigo, 'ORDEN_CANCELADA');
   });
 });

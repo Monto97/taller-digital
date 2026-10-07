@@ -46,6 +46,17 @@ router.delete('/:id/items/:itemId', validate({ params: schemas.paramsItem }), as
   res.json(await service.eliminarItem(req.auth, id, itemId));
 });
 
+// --- Pagos ---
+router.post('/:id/pagos', validate({ params: paramsId, body: schemas.pago }), async (req, res) => {
+  res.status(201).json(await service.registrarPago(req.auth, req.datos.params.id, req.datos.body));
+});
+
+router.delete('/:id/pagos/:pagoId', validate({ params: schemas.paramsPago, body: schemas.anularPago }), async (req, res) => {
+  const { id, pagoId } = req.datos.params;
+  // body opcional en el DELETE: solo lleva motivo si se quiere dejar escrito por qué se anuló.
+  res.json(await service.anularPago(req.auth, id, pagoId, req.datos.body));
+});
+
 // --- Presupuesto y WhatsApp ---
 router.post('/:id/presupuesto/enviar', validate({ params: paramsId }), async (req, res) => {
   res.json(await service.enviarPresupuesto(req.auth, req.datos.params.id));

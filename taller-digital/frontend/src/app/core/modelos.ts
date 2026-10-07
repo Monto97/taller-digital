@@ -12,6 +12,7 @@ export type EstadoOrden =
 export type TipoVehiculo = 'auto' | 'moto';
 export type TipoItem = 'repuesto' | 'mano_de_obra' | 'otro';
 export type PlantillaWhatsapp = 'recibido' | 'presupuesto' | 'listo' | 'pdf';
+export type MedioPago = 'efectivo' | 'transferencia' | 'mercado_pago' | 'tarjeta' | 'otro';
 
 export interface Usuario {
   id: number;
@@ -67,12 +68,34 @@ export interface Item {
 
 export interface Evento {
   id: number;
-  tipo: 'creada' | 'cambio_estado' | 'presupuesto_enviado' | 'presupuesto_aprobado' | 'presupuesto_rechazado' | 'aviso_whatsapp' | 'nota';
+  tipo:
+    | 'creada'
+    | 'cambio_estado'
+    | 'presupuesto_enviado'
+    | 'presupuesto_aprobado'
+    | 'presupuesto_rechazado'
+    | 'aviso_whatsapp'
+    | 'nota'
+    | 'pago_registrado'
+    | 'pago_anulado';
   estado_desde: EstadoOrden | null;
   estado_hasta: EstadoOrden | null;
   detalle: string | null;
   created_at: string;
   usuario_nombre: string | null;
+}
+
+export interface Pago {
+  id: number;
+  monto: string;
+  medio: MedioPago;
+  medio_etiqueta: string;
+  fecha: string;
+  nota: string | null;
+  usuario_nombre: string | null;
+  anulada_at: string | null;
+  anulada_motivo: string | null;
+  anulada_por_nombre: string | null;
 }
 
 export interface Orden {
@@ -96,6 +119,9 @@ export interface Orden {
   cliente: ClienteResumen;
   mecanico: { id: number; nombre: string } | null;
   items: Item[];
+  pagado: string;
+  saldo: string;
+  pagos: Pago[];
   eventos: Evento[];
   /** Solo viene en las respuestas de acciones que generan un aviso (crear, enviar presupuesto, pasar a listo). */
   whatsapp_url?: string | null;
@@ -153,6 +179,13 @@ export interface OrdenPublica {
     enviado_at: string | null;
     respondido_at: string | null;
     items: { tipo: TipoItem; descripcion: string; cantidad: string; precio_unitario: string; subtotal: string }[];
+  } | null;
+  pago: {
+    total: string;
+    pagado: string;
+    saldo: string;
+    /** true si el taller tiene conectada su cuenta de Mercado Pago. */
+    mp_disponible: boolean;
   } | null;
   linea_de_tiempo: { estado: EstadoOrden; fecha: string }[];
 }
@@ -220,6 +253,19 @@ export interface AdminTaller {
   monto_entregado: string;
   ultima_actividad: string | null;
   uso: UsoTaller;
+}
+
+// ---------- Mercado Pago ----------
+
+export interface MpEstado {
+  /** false si el servidor todavía no tiene las credenciales de la app MP. */
+  configurado: boolean;
+  conectado: boolean;
+  mp_user_id?: string;
+  /** false si el taller conectó con credenciales de prueba (sandbox). */
+  live_mode?: boolean;
+  conectado_at?: string;
+  expires_at?: string | null;
 }
 
 export interface ErrorApi {

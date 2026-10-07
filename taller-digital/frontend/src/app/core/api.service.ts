@@ -2,7 +2,7 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import {
-  AdminResumen, AdminTaller, ClienteResumen, EntregaReciente, ErrorApi, EstadoOrden, Orden, OrdenHistorial, OrdenPublica, PanelNumeros, PlantillaWhatsapp, Sesion, Tablero, TipoItem, TipoVehiculo, Vehiculo,
+  AdminResumen, AdminTaller, ClienteResumen, EntregaReciente, ErrorApi, EstadoOrden, MedioPago, MpEstado, Orden, OrdenHistorial, OrdenPublica, PanelNumeros, PlantillaWhatsapp, Sesion, Tablero, TipoItem, TipoVehiculo, Vehiculo,
 } from './modelos';
 
 /** En desarrollo el proxy de Angular manda /api al backend (ver proxy.conf.json). */
@@ -56,6 +56,13 @@ export interface DatosItem {
   descripcion: string;
   cantidad: number;
   precio_unitario: number;
+}
+
+export interface DatosPago {
+  monto: number;
+  medio: MedioPago;
+  fecha?: string;
+  nota?: string | null;
 }
 
 /**
@@ -133,8 +140,18 @@ export class ApiService {
   editarOrden(id: number, datos: { diagnostico?: string | null; km_ingreso?: number | null; motivo?: string }) {
     return this.patch<Orden>(`/ordenes/${id}`, datos);
   }
-  cambiarEstado(id: number, estado: EstadoOrden) {
-    return this.post<Orden>(`/ordenes/${id}/estado`, { estado });
+  cambiarEstado(id: number, estado: EstadoOrden, opciones: { confirmar_saldo_pendiente?: boolean } = {}) {
+    return this.post<Orden>(`/ordenes/${id}/estado`, { estado, ...opciones });
+  }
+  registrarPago(id: number, datos: DatosPago) {
+    return this.post<Orden>(`/ordenes/${id}/pagos`, datos);
+  }
+  anularPago(id: number, pagoId: number, motivo?: string) {
+    return firstValueFrom(
+      this.http.request<Orden>('delete', `${API_URL}/ordenes/${id}/pagos/${pagoId}`, {
+        body: motivo ? { motivo } : {},
+      }),
+    );
   }
   agregarNota(id: number, detalle: string) {
     return this.post<Orden>(`/ordenes/${id}/notas`, { detalle });
@@ -175,6 +192,17 @@ export class ApiService {
   }
   adminHabilitar(id: number, activo: boolean) {
     return this.patch<AdminTaller>(`/admin/talleres/${id}`, { activo });
+  }
+
+  // Mercado Pago
+  mpEstado() {
+    return this.get<MpEstado>('/mp/estado');
+  }
+  mpUrl() {
+    return this.get<{ url: string }>('/mp/url');
+  }
+  mpDesconectar() {
+    return this.delete<{ desconectado: boolean }>('/mp/conexion');
   }
 
   // Público (link del cliente, sin login)

@@ -58,6 +58,30 @@ async function obtener(token) {
     [orden.id],
   );
 
+  // Pago online: solo tiene sentido mostrarlo si ya hay un presupuesto enviado o aprobado
+  // (antes de eso, el cliente no vio precios todavía).
+  let pago = null;
+  if (presupuesto) {
+    const [[sumas]] = await pool.query(
+      `SELECT COALESCE(SUM(monto), 0) AS pagado FROM orden_pagos
+        WHERE orden_id = ? AND anulada_at IS NULL`,
+      [orden.id],
+    );
+    const total = Number(orden.total);
+    const pagado = Number(sumas.pagado);
+    const saldo = Math.round((total - pagado) * 100) / 100;
+    const [[mp]] = await pool.query(
+      'SELECT 1 AS existe FROM taller_mercadopago WHERE taller_id = ?',
+      [orden.taller_id],
+    );
+    pago = {
+      total: total.toFixed(2),
+      pagado: pagado.toFixed(2),
+      saldo: (Math.abs(saldo) < 0.01 ? 0 : saldo).toFixed(2),
+      mp_disponible: Boolean(mp),
+    };
+  }
+
   return {
     taller: {
       nombre: datos.taller_nombre,
@@ -77,6 +101,7 @@ async function obtener(token) {
     },
     vehiculo: { patente: datos.patente, tipo: datos.tipo, marca: datos.marca, modelo: datos.modelo },
     presupuesto,
+    pago,
     linea_de_tiempo: eventos.map((e) => ({ estado: e.estado_hasta, fecha: e.created_at })),
   };
 }

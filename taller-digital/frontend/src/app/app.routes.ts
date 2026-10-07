@@ -62,6 +62,11 @@ export const routes: Routes = [
         title: 'Historial · Taller Digital',
         loadComponent: () => import('./pages/historial/historial').then((m) => m.HistorialPagina),
       },
+      {
+        path: 'ajustes',
+        title: 'Ajustes · Taller Digital',
+        loadComponent: () => import('./pages/ajustes/ajustes').then((m) => m.AjustesPagina),
+      },
     ],
   },
   { path: '**', redirectTo: '' },

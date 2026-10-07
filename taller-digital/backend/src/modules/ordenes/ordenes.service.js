@@ -59,6 +59,38 @@ async function actualizarKmVehiculo(conn, vehiculoId, km) {
   );
 }
 
+const ETIQUETAS_MEDIO = {
+  efectivo: 'Efectivo',
+  transferencia: 'Transferencia',
+  mercado_pago: 'Mercado Pago',
+  tarjeta: 'Tarjeta',
+  otro: 'Otro',
+};
+
+/** Da formato "$ 12.345" para dejar en la bitácora. */
+function montoLegible(valor) {
+  const n = Number(valor);
+  if (!Number.isFinite(n)) return `$ ${valor}`;
+  return `$ ${new Intl.NumberFormat('es-AR', { maximumFractionDigits: 2 }).format(n)}`;
+}
+
+/** Suma de pagos NO anulados de una orden. Devuelve número con dos decimales. */
+async function pagadoDeOrden(conn, ordenId) {
+  const [[fila]] = await conn.query(
+    `SELECT COALESCE(SUM(monto), 0) AS pagado
+       FROM orden_pagos
+      WHERE orden_id = ? AND anulada_at IS NULL`,
+    [ordenId],
+  );
+  return Number(fila.pagado);
+}
+
+/** total - pagado, con tolerancia de 1 centavo para evitar falsos saldos. */
+function saldoDesde(total, pagado) {
+  const diff = Math.round((Number(total) - Number(pagado)) * 100) / 100;
+  return Math.abs(diff) < 0.01 ? 0 : diff;
+}
+
 async function recalcularTotal(conn, ordenId) {
   await conn.query(
     `UPDATE ordenes
@@ -93,7 +125,10 @@ async function datosParaMensaje(tallerId, id) {
     `SELECT o.id, o.numero, o.total, o.token_publico,
             c.nombre AS cliente_nombre, c.telefono AS cliente_telefono,
             v.marca, v.modelo, v.patente, v.tipo,
-            t.nombre AS taller_nombre
+            t.nombre AS taller_nombre,
+            EXISTS(SELECT 1 FROM taller_mercadopago mp WHERE mp.taller_id = o.taller_id) AS mp_disponible,
+            GREATEST(o.total - COALESCE((SELECT SUM(monto) FROM orden_pagos
+               WHERE orden_id = o.id AND anulada_at IS NULL), 0), 0) AS saldo
        FROM ordenes o
        JOIN clientes c ON c.id = o.cliente_id
        JOIN vehiculos v ON v.id = o.vehiculo_id
@@ -107,6 +142,8 @@ async function datosParaMensaje(tallerId, id) {
     numero: f.numero,
     total: f.total,
     token_publico: f.token_publico,
+    saldo: f.saldo,
+    mp_disponible: Boolean(f.mp_disponible),
     cliente: { nombre: f.cliente_nombre, telefono: f.cliente_telefono },
     vehiculo: { marca: f.marca, modelo: f.modelo, patente: f.patente, tipo: f.tipo },
     taller: { nombre: f.taller_nombre },
@@ -257,12 +294,42 @@ async function obtener(tallerId, id) {
   const o = filas[0];
   if (!o) throw AppError.noEncontrado('La orden');
 
+  const [items] = await pool.query(
+    `SELECT id, tipo, descripcion, cantidad, precio_unitario,
+            ROUND(cantidad * precio_unitario, 2) AS subtotal
+       FROM orden_items WHERE orden_id = ? ORDER BY posicion, id`,
+    [id],
+  );
+  const [pagos] = await pool.query(
+    `SELECT p.id, p.monto, p.medio, p.fecha, p.nota,
+            p.anulada_at, p.anulada_motivo,
+            u.nombre AS usuario_nombre,
+            ua.nombre AS anulada_por_nombre
+       FROM orden_pagos p
+       LEFT JOIN usuarios u  ON u.id  = p.usuario_id
+       LEFT JOIN usuarios ua ON ua.id = p.anulada_por
+      WHERE p.orden_id = ?
+      ORDER BY p.fecha, p.id`,
+    [id],
+  );
+  const pagado = pagos
+    .filter((p) => p.anulada_at == null)
+    .reduce((acc, p) => acc + Number(p.monto), 0);
+  const saldo = saldoDesde(o.total, pagado);
+  const [[mpRow]] = await pool.query(
+    'SELECT 1 AS existe FROM taller_mercadopago WHERE taller_id = ?',
+    [tallerId],
+  );
+  const mpDisponible = Boolean(mpRow);
+
   // Links de WhatsApp ya armados: el front los usa como links comunes,
   // que ningún navegador bloquea (a diferencia de abrir una ventana por código).
   const datosMensaje = {
     numero: o.numero,
     total: o.total,
     token_publico: o.token_publico,
+    saldo: saldo.toFixed(2),
+    mp_disponible: mpDisponible,
     cliente: { nombre: o.cliente_nombre, telefono: o.cliente_telefono },
     vehiculo: { marca: o.marca, modelo: o.modelo, patente: o.patente, tipo: o.tipo },
     taller: { nombre: o.taller_nombre },
@@ -270,13 +337,6 @@ async function obtener(tallerId, id) {
   const whatsappLinks = o.cliente_telefono
     ? Object.fromEntries(['recibido', 'presupuesto', 'listo', 'pdf'].map((p) => [p, armarWhatsapp(datosMensaje, p)]))
     : null;
-
-  const [items] = await pool.query(
-    `SELECT id, tipo, descripcion, cantidad, precio_unitario,
-            ROUND(cantidad * precio_unitario, 2) AS subtotal
-       FROM orden_items WHERE orden_id = ? ORDER BY posicion, id`,
-    [id],
-  );
   const [eventos] = await pool.query(
     `SELECT e.id, e.tipo, e.estado_desde, e.estado_hasta, e.detalle, e.created_at,
             u.nombre AS usuario_nombre
@@ -314,6 +374,20 @@ async function obtener(tallerId, id) {
     cliente: { id: o.cliente_id, nombre: o.cliente_nombre, telefono: o.cliente_telefono },
     mecanico: o.mecanico_id ? { id: o.mecanico_id, nombre: o.mecanico_nombre } : null,
     items,
+    pagado: pagado.toFixed(2),
+    saldo: saldo.toFixed(2),
+    pagos: pagos.map((p) => ({
+      id: p.id,
+      monto: p.monto,
+      medio: p.medio,
+      medio_etiqueta: ETIQUETAS_MEDIO[p.medio] || p.medio,
+      fecha: p.fecha,
+      nota: p.nota,
+      usuario_nombre: p.usuario_nombre,
+      anulada_at: p.anulada_at,
+      anulada_motivo: p.anulada_motivo,
+      anulada_por_nombre: p.anulada_por_nombre,
+    })),
     eventos: eventos.map((e) => ({ ...e, usuario_nombre: e.usuario_nombre ?? (e.tipo.startsWith('presupuesto_') ? 'Cliente' : null) })),
   };
 }
@@ -335,7 +409,7 @@ async function editar(auth, id, datos) {
   return obtener(tallerId, id);
 }
 
-async function cambiarEstado(auth, id, { estado: nuevo, detalle }) {
+async function cambiarEstado(auth, id, { estado: nuevo, detalle, confirmar_saldo_pendiente }) {
   const { tallerId, usuarioId } = auth;
   let whatsappUrl = null;
 
@@ -361,7 +435,23 @@ async function cambiarEstado(auth, id, { estado: nuevo, detalle }) {
       await registrarEvento(conn, id, usuarioId, 'presupuesto_aprobado', { detalle: 'Aprobado por el taller' });
     }
     if (nuevo === 'entregado') {
+      // Aviso de saldo: si queda plata por cobrar, el front tiene que confirmar.
+      const pagado = await pagadoDeOrden(conn, id);
+      const saldo = saldoDesde(orden.total, pagado);
+      if (saldo > 0 && !confirmar_saldo_pendiente) {
+        throw new AppError(
+          409,
+          'SALDO_PENDIENTE',
+          `Faltan cobrar ${montoLegible(saldo)}. Registrá el pago o confirmá que se entrega con saldo pendiente.`,
+          { saldo: saldo.toFixed(2), total: Number(orden.total).toFixed(2), pagado: pagado.toFixed(2) },
+        );
+      }
       await conn.query('UPDATE ordenes SET fecha_entrega = UTC_TIMESTAMP() WHERE id = ?', [id]);
+      if (saldo > 0) {
+        await registrarEvento(conn, id, usuarioId, 'nota', {
+          detalle: `Se entregó con un saldo pendiente de ${montoLegible(saldo)}.`,
+        });
+      }
     }
 
     await cambiarEstadoInterno(conn, orden, nuevo, usuarioId, detalle ?? null);
@@ -482,6 +572,83 @@ async function registrarAviso(auth, id, plantilla) {
   await registrarEvento(pool, id, usuarioId, 'aviso_whatsapp', { detalle: plantilla });
 }
 
+// --- Pagos -----------------------------------------------------------------
+
+async function registrarPago(auth, id, { monto, medio, fecha, nota }) {
+  const { tallerId, usuarioId } = auth;
+
+  await withTransaction(async (conn) => {
+    const orden = await buscarOFallar(conn, tallerId, id, { forUpdate: true });
+    if (orden.estado === 'cancelada') {
+      throw AppError.conflicto('ORDEN_CANCELADA', 'La orden está cancelada: no se pueden registrar cobros.');
+    }
+
+    await conn.query(
+      `INSERT INTO orden_pagos (taller_id, orden_id, usuario_id, monto, medio, fecha, nota)
+       VALUES (?, ?, ?, ?, ?, ${fecha ? '?' : 'UTC_TIMESTAMP()'}, ?)`,
+      fecha
+        ? [tallerId, id, usuarioId, monto, medio, fecha, nota ?? null]
+        : [tallerId, id, usuarioId, monto, medio, nota ?? null],
+    );
+
+    const detalle = `${ETIQUETAS_MEDIO[medio]} ${montoLegible(monto)}${nota ? `: ${nota}` : ''}`.slice(0, 500);
+    await registrarEvento(conn, id, usuarioId, 'pago_registrado', { detalle });
+  });
+
+  return obtener(tallerId, id);
+}
+
+/**
+ * Registra un pago vinculado a un cobro de Mercado Pago. Se invoca desde el webhook,
+ * donde no hay sesión: por eso usuario_id queda NULL. Devuelve el id del orden_pagos
+ * creado para que el servicio de MP pueda vincularlo en orden_pagos_mp.
+ */
+async function registrarPagoDesdeMp(tallerId, ordenId, { monto, mpOrderId }) {
+  let pagoId;
+  await withTransaction(async (conn) => {
+    const orden = await buscarOFallar(conn, tallerId, ordenId, { forUpdate: true });
+    if (orden.estado === 'cancelada') {
+      throw AppError.conflicto('ORDEN_CANCELADA', 'La orden está cancelada: no se puede acreditar el pago.');
+    }
+    const [res] = await conn.query(
+      `INSERT INTO orden_pagos (taller_id, orden_id, usuario_id, monto, medio, fecha, nota)
+       VALUES (?, ?, NULL, ?, 'mercado_pago', UTC_TIMESTAMP(), ?)`,
+      [tallerId, ordenId, monto, `Mercado Pago · ref ${mpOrderId}`.slice(0, 500)],
+    );
+    pagoId = res.insertId;
+    const detalle = `Mercado Pago ${montoLegible(monto)} (ref ${mpOrderId})`.slice(0, 500);
+    await registrarEvento(conn, ordenId, null, 'pago_registrado', { detalle });
+  });
+  return pagoId;
+}
+
+async function anularPago(auth, id, pagoId, { motivo }) {
+  const { tallerId, usuarioId } = auth;
+
+  await withTransaction(async (conn) => {
+    await buscarOFallar(conn, tallerId, id);
+    const [filas] = await conn.query(
+      'SELECT id, monto, medio, anulada_at FROM orden_pagos WHERE id = ? AND orden_id = ? AND taller_id = ? FOR UPDATE',
+      [pagoId, id, tallerId],
+    );
+    const pago = filas[0];
+    if (!pago) throw AppError.noEncontrado('El pago');
+    if (pago.anulada_at) {
+      throw AppError.conflicto('PAGO_YA_ANULADO', 'Ese pago ya estaba anulado.');
+    }
+
+    await conn.query(
+      'UPDATE orden_pagos SET anulada_at = UTC_TIMESTAMP(), anulada_por = ?, anulada_motivo = ? WHERE id = ?',
+      [usuarioId, motivo ?? null, pagoId],
+    );
+
+    const detalle = `${ETIQUETAS_MEDIO[pago.medio]} ${montoLegible(pago.monto)}${motivo ? ` (${motivo})` : ''}`.slice(0, 500);
+    await registrarEvento(conn, id, usuarioId, 'pago_anulado', { detalle });
+  });
+
+  return obtener(tallerId, id);
+}
+
 // --- PDF -------------------------------------------------------------------
 
 /**
@@ -582,4 +749,5 @@ module.exports = {
   crear, listar, obtener, editar, cambiarEstado, agregarNota,
   agregarItem, editarItem, eliminarItem,
   enviarPresupuesto, linkWhatsapp, registrarAviso, pdf, tablero,
+  registrarPago, anularPago, registrarPagoDesdeMp,
 };
