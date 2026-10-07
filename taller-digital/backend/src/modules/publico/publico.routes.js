@@ -89,6 +89,15 @@ router.get('/mp/iniciar-pago/:token', validate({ params: paramsToken }), async (
       NO_ENCONTRADO: 'no_encontrado',
     };
     const motivo = motivos[codigo] || 'error';
+    if (motivo === 'error') {
+      // eslint-disable-next-line no-console
+      console.error('[mp-iniciar-pago] error', {
+        token,
+        mensaje: err?.message,
+        mpStatus: err?.mpStatus,
+        mpBody: err?.mpBody,
+      });
+    }
     return res.redirect(302, `${base}/o/${token}?pago=${motivo}`);
   }
 });
