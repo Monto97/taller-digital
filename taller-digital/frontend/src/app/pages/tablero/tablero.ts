@@ -58,7 +58,7 @@ type Columna = keyof DatosTablero['columnas'];
                       <span class="cuando">{{ t.fecha_ingreso | cuando }}</span>
                     </div>
                     <strong>{{ t.vehiculo || (t.tipo === 'moto' ? 'Moto' : 'Auto') }}</strong>
-                    <span class="motivo">{{ t.motivo }}</span>
+                    @if (t.motivo) { <span class="motivo">{{ t.motivo }}</span> }
                     <div class="abajo">
                       <span>{{ t.cliente }}</span>
                       @if (+t.total > 0) { <span class="total">{{ t.total | pesos }}</span> }

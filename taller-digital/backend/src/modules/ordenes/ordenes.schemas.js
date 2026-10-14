@@ -13,7 +13,7 @@ const crear = z
   .object({
     vehiculo_id: z.coerce.number().int().positive().optional(),
     vehiculo: vehiculosSchemas.crear.optional(),
-    motivo: z.string().trim().min(3, 'Contá qué le pasa al vehículo.').max(2000),
+    motivo: z.string().trim().max(2000).optional().default(''),
     km_ingreso: z.coerce.number().int().min(0).max(2_000_000).nullish(),
     mecanico_id: idOpcional,
     fecha_estimada_entrega: fechaOpcional,
@@ -30,7 +30,7 @@ const crear = z
 
 const editar = z
   .object({
-    motivo: z.string().trim().min(3).max(2000),
+    motivo: z.string().trim().max(2000),
     diagnostico: textoOpcional(5000),
     km_ingreso: z.coerce.number().int().min(0).max(2_000_000).nullable(),
     mecanico_id: idOpcional,

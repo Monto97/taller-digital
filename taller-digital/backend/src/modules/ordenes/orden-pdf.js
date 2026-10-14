@@ -87,7 +87,7 @@ async function generarPdf({ taller, orden, cliente, vehiculo, items, tipo }) {
   const km = vehiculo.km_actual != null ? `${Number(vehiculo.km_actual).toLocaleString('es-AR')} km` : null;
   bloque(doc, 'VEHÍCULO', [`${formatearPatente(vehiculo.patente)} · ${nombreVehiculo}`, km].filter(Boolean));
 
-  bloque(doc, 'QUÉ HAY QUE HACER', [orden.motivo]);
+  if (orden.motivo) bloque(doc, 'QUÉ HAY QUE HACER', [orden.motivo]);
   if (orden.diagnostico) bloque(doc, 'DIAGNÓSTICO', [orden.diagnostico]);
 
   linea(doc, izq, ancho);

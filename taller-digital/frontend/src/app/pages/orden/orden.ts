@@ -8,10 +8,23 @@ import { CantidadPipe, CuandoPipe, ETIQUETA_ESTADO, KmPipe, Patente, PesosPipe, 
 /** El paso que conviene destacar en cada estado: el botón grande. */
 const SIGUIENTE_PRINCIPAL: Partial<Record<EstadoOrden, EstadoOrden>> = {
   recibido: 'diagnostico',
+  diagnostico: 'en_reparacion',
   esperando_aprobacion: 'en_reparacion',
   en_reparacion: 'listo',
   listo: 'entregado',
 };
+
+/**
+ * Pasos del stepper, en orden. "esperando_aprobacion" se muestra como "diagnostico"
+ * (son dos matices del mismo momento: todavía no se empezó a arreglar).
+ */
+const PASOS: { clave: EstadoOrden; etiqueta: string; incluye: EstadoOrden[] }[] = [
+  { clave: 'recibido',      etiqueta: 'Recibido',    incluye: ['recibido'] },
+  { clave: 'diagnostico',   etiqueta: 'Diagnóstico', incluye: ['diagnostico', 'esperando_aprobacion'] },
+  { clave: 'en_reparacion', etiqueta: 'Reparación',  incluye: ['en_reparacion'] },
+  { clave: 'listo',         etiqueta: 'Listo',       incluye: ['listo'] },
+  { clave: 'entregado',     etiqueta: 'Entregado',   incluye: ['entregado'] },
+];
 
 const TIPOS_ITEM: { valor: TipoItem; texto: string }[] = [
   { valor: 'repuesto', texto: 'Repuesto' },
@@ -67,10 +80,26 @@ const MEDIOS_PAGO: { valor: MedioPago; texto: string }[] = [
             <!-- Estado y acciones -->
             <section class="panel" aria-labelledby="t-estado">
               <h2 id="t-estado" class="oculto">Estado</h2>
-              <p class="estado-actual estado estado-{{ o.estado }}">{{ etiqueta[o.estado] }}</p>
+
+              @if (o.estado !== 'cancelada') {
+                <ol class="stepper" aria-label="Progreso de la orden">
+                  @for (paso of pasos; track paso.clave; let i = $index) {
+                    <li class="stepper-paso"
+                        [class.hecho]="indiceActual() > i"
+                        [class.actual]="indiceActual() === i">
+                      <span class="stepper-punto" aria-hidden="true">{{ indiceActual() > i ? '✓' : (i + 1) }}</span>
+                      <span class="stepper-texto">{{ paso.etiqueta }}</span>
+                    </li>
+                  }
+                </ol>
+              } @else {
+                <p class="estado-actual estado estado-cancelada">Cancelada</p>
+              }
+
               @if (o.estado === 'esperando_aprobacion') {
-                <p class="suave">Presupuesto enviado {{ o.presupuesto.enviado_at | cuando }}</p>
-                <p class="suave">Si el cliente te avisó por teléfono que lo aprueba, marcalo con el botón de abajo.</p>
+                <p class="suave nota-estado">
+                  Presupuesto enviado {{ o.presupuesto.enviado_at | cuando }}. Si el cliente te avisó que lo aprueba, tocá <strong>Empezar reparación</strong>.
+                </p>
               }
 
               @if (o.estados_siguientes.length) {
@@ -85,10 +114,10 @@ const MEDIOS_PAGO: { valor: MedioPago; texto: string }[] = [
                       {{ texto(o.estado, e) }}
                     </button>
                   }
-                  @if (o.estados_siguientes.includes('cancelada')) {
-                    <button type="button" class="btn-peligro" [disabled]="ocupado()" (click)="cancelar()">Cancelar orden</button>
-                  }
                 </div>
+                @if (o.estados_siguientes.includes('cancelada')) {
+                  <button type="button" class="btn-texto cancelar" [disabled]="ocupado()" (click)="cancelar()">Cancelar orden</button>
+                }
               } @else {
                 <p class="suave">
                   @if (o.estado === 'entregado') { Entregado {{ o.fecha_entrega | cuando }}. La orden quedó cerrada. }
@@ -113,7 +142,7 @@ const MEDIOS_PAGO: { valor: MedioPago; texto: string }[] = [
                 }
               } @else {
                 <div class="campo">
-                  <label for="motivo-edit">¿Qué le pasa o qué hay que hacerle?</label>
+                  <label for="motivo-edit">¿Qué le pasa o qué hay que hacerle? <span class="suave">(opcional)</span></label>
                   <textarea id="motivo-edit" class="textarea" [(ngModel)]="motivoEditado"></textarea>
                 </div>
                 <div class="campo km-corto">
@@ -121,7 +150,7 @@ const MEDIOS_PAGO: { valor: MedioPago; texto: string }[] = [
                   <input id="km-edit" class="input" type="number" inputmode="numeric" min="0" [(ngModel)]="kmEditado" />
                 </div>
                 <div class="acciones-form">
-                  <button type="button" class="btn btn-oscuro" [disabled]="ocupado() || motivoEditado.trim().length < 3"
+                  <button type="button" class="btn btn-oscuro" [disabled]="ocupado()"
                           (click)="guardarMotivo()">Guardar</button>
                   <button type="button" class="btn-texto" (click)="editandoMotivo.set(false)">Cancelar</button>
                 </div>
@@ -140,94 +169,6 @@ const MEDIOS_PAGO: { valor: MedioPago; texto: string }[] = [
                 <div><h3>Diagnóstico</h3><p>{{ o.diagnostico }}</p></div>
               }
             </section>
-
-            <!-- Pagos -->
-            <section class="panel pila" aria-labelledby="t-pagos">
-              <div class="titulo-fila">
-                <h2 id="t-pagos">Pagos</h2>
-                <span class="estado-pago"
-                      [class.pagado]="estaPagado()"
-                      [class.deuda]="debe()">
-                  @if (estaPagado()) { Pagado }
-                  @else if (debe()) { Debe {{ o.saldo | pesos }} }
-                  @else { Sin cobrar }
-                </span>
-              </div>
-
-              @if (pagosActivos().length) {
-                <ul class="pagos">
-                  @for (p of pagosActivos(); track p.id) {
-                    <li>
-                      <div>
-                        <span class="desc">{{ p.medio_etiqueta }} — {{ p.monto | pesos }}</span>
-                        <span class="suave detalle">
-                          {{ p.fecha | cuando }}@if (p.usuario_nombre) {, {{ p.usuario_nombre }}}@if (p.nota) {, {{ p.nota }}}
-                        </span>
-                      </div>
-                      <button type="button" class="quitar" [attr.aria-label]="'Anular ' + p.medio_etiqueta"
-                              [disabled]="ocupado()" (click)="anularPago(p)">×</button>
-                    </li>
-                  }
-                </ul>
-                <p class="total total-pagos">
-                  <span>Cobrado</span><span>{{ o.pagado | pesos }}</span>
-                </p>
-              } @else {
-                <p class="suave">Todavía no se registró ningún cobro.</p>
-              }
-
-              @if (o.estado !== 'cancelada') {
-                @if (!mostrandoFormPago()) {
-                  <button type="button" class="btn btn-oscuro" (click)="abrirFormPago()">Registrar pago</button>
-                } @else {
-                  <form class="nuevo-item pila" (ngSubmit)="registrarPago()">
-                    <div class="opciones" role="group" aria-label="Medio de pago">
-                      @for (m of medios; track m.valor) {
-                        <button type="button" class="opcion" [attr.aria-pressed]="medioPago === m.valor" (click)="medioPago = m.valor">{{ m.texto }}</button>
-                      }
-                    </div>
-                    <div class="fila monto-fecha">
-                      <div class="campo">
-                        <label for="pago-monto">Monto</label>
-                        <input id="pago-monto" name="monto" class="input" type="number" inputmode="decimal" min="0.01" step="any" placeholder="0" [(ngModel)]="montoPago" />
-                        @if (debe()) {
-                          <button type="button" class="btn-texto" (click)="montoPago = +o.saldo">Cobrar saldo ({{ o.saldo | pesos }})</button>
-                        }
-                      </div>
-                      <div class="campo">
-                        <label for="pago-fecha">Fecha</label>
-                        <input id="pago-fecha" name="fecha" class="input" type="date" [(ngModel)]="fechaPago" />
-                      </div>
-                    </div>
-                    <div class="campo">
-                      <label for="pago-nota">Nota (opcional)</label>
-                      <input id="pago-nota" name="nota" class="input" placeholder="Seña para encargar repuestos" [(ngModel)]="notaPago" />
-                    </div>
-                    <div class="acciones-form">
-                      <button type="submit" class="btn btn-oscuro" [disabled]="!puedeCobrar() || ocupado()">Guardar pago</button>
-                      <button type="button" class="btn-texto" (click)="cerrarFormPago()">Cancelar</button>
-                    </div>
-                  </form>
-                }
-              }
-            </section>
-
-            <!-- Confirmación al entregar con saldo pendiente -->
-            @if (saldoAlEntregar(); as s) {
-              <div class="panel aviso-saldo">
-                <div>
-                  <strong>Faltan cobrar {{ s | pesos }}</strong>
-                  <p class="suave">Registrá el pago o confirmá que se entrega igual.</p>
-                </div>
-                <div class="acciones">
-                  <button type="button" class="btn btn-oscuro" [disabled]="ocupado()"
-                          (click)="saldoAlEntregar.set(null); abrirFormPago()">Registrar pago</button>
-                  <button type="button" class="btn-peligro" [disabled]="ocupado()"
-                          (click)="entregarConSaldoPendiente()">Entregar con saldo pendiente</button>
-                  <button type="button" class="btn-texto" (click)="saldoAlEntregar.set(null)">Volver</button>
-                </div>
-              </div>
-            }
 
             <!-- Presupuesto -->
             <section class="panel pila" aria-labelledby="t-presupuesto">
@@ -313,6 +254,116 @@ const MEDIOS_PAGO: { valor: MedioPago; texto: string }[] = [
                 }
               }
             </section>
+
+            <!-- Pagos -->
+            <section class="panel pila" aria-labelledby="t-pagos">
+              <div class="titulo-fila">
+                <h2 id="t-pagos">Pagos</h2>
+                <span class="estado-pago"
+                      [class.pagado]="estaPagado()"
+                      [class.deuda]="debe()">
+                  @if (estaPagado()) { Pagado }
+                  @else if (debe()) { Debe {{ o.saldo | pesos }} }
+                  @else { Sin cobrar }
+                </span>
+              </div>
+
+              <div class="resumen-pagos">
+                <div class="resumen-celda">
+                  <span class="resumen-etiqueta">Total</span>
+                  <span class="resumen-monto">{{ o.total | pesos }}</span>
+                </div>
+                <div class="resumen-celda">
+                  <span class="resumen-etiqueta">Cobrado</span>
+                  <span class="resumen-monto cobrado">{{ o.pagado | pesos }}</span>
+                </div>
+                <div class="resumen-celda">
+                  <span class="resumen-etiqueta">Saldo</span>
+                  <span class="resumen-monto"
+                        [class.saldo-deuda]="debe()"
+                        [class.saldo-ok]="estaPagado()">{{ o.saldo | pesos }}</span>
+                </div>
+              </div>
+
+              @if (pagosActivos().length) {
+                <ul class="pagos">
+                  @for (p of pagosActivos(); track p.id) {
+                    <li>
+                      <div>
+                        <span class="desc">{{ p.medio_etiqueta }} — {{ p.monto | pesos }}</span>
+                        <span class="suave detalle">
+                          {{ p.fecha | cuando }}@if (p.usuario_nombre) {, {{ p.usuario_nombre }}}@if (p.nota) {, {{ p.nota }}}
+                        </span>
+                      </div>
+                      <button type="button" class="quitar" [attr.aria-label]="'Anular ' + p.medio_etiqueta"
+                              [disabled]="ocupado()" (click)="anularPago(p)">×</button>
+                    </li>
+                  }
+                </ul>
+              }
+
+              @if (o.estado !== 'cancelada' && !mostrandoFormPago()) {
+                <div class="pago-acciones">
+                  @if (debe()) {
+                    <button type="button" class="btn btn-primario btn-ancho" (click)="abrirFormPago(true)">
+                      Cobrar saldo {{ o.saldo | pesos }}
+                    </button>
+                    <button type="button" class="btn-texto" (click)="abrirFormPago(false)">Registrar otro pago</button>
+                  } @else {
+                    <button type="button" class="btn btn-oscuro" (click)="abrirFormPago(false)">Registrar pago</button>
+                  }
+                </div>
+              }
+
+              @if (mostrandoFormPago()) {
+                <form class="nuevo-item pila" (ngSubmit)="registrarPago()">
+                  <div class="opciones" role="group" aria-label="Medio de pago">
+                    @for (m of medios; track m.valor) {
+                      <button type="button" class="opcion" [attr.aria-pressed]="medioPago === m.valor" (click)="medioPago = m.valor">{{ m.texto }}</button>
+                    }
+                  </div>
+                  <div class="campo monto-corto">
+                    <label for="pago-monto">Monto</label>
+                    <input id="pago-monto" name="monto" class="input" type="number" inputmode="decimal" min="0.01" step="any" placeholder="0" [(ngModel)]="montoPago" />
+                  </div>
+
+                  @if (!mostrarOpcionesPago()) {
+                    <button type="button" class="btn-texto" (click)="mostrarOpcionesPago.set(true)">Cambiar fecha o agregar nota</button>
+                  } @else {
+                    <div class="campo">
+                      <label for="pago-fecha">Fecha</label>
+                      <input id="pago-fecha" name="fecha" class="input" type="date" [(ngModel)]="fechaPago" />
+                    </div>
+                    <div class="campo">
+                      <label for="pago-nota">Nota (opcional)</label>
+                      <input id="pago-nota" name="nota" class="input" placeholder="Seña para encargar repuestos" [(ngModel)]="notaPago" />
+                    </div>
+                  }
+
+                  <div class="acciones-form">
+                    <button type="submit" class="btn btn-oscuro" [disabled]="!puedeCobrar() || ocupado()">Guardar pago</button>
+                    <button type="button" class="btn-texto" (click)="cerrarFormPago()">Cancelar</button>
+                  </div>
+                </form>
+              }
+            </section>
+
+            <!-- Confirmación al entregar con saldo pendiente -->
+            @if (saldoAlEntregar(); as s) {
+              <div class="panel aviso-saldo">
+                <div>
+                  <strong>Faltan cobrar {{ s | pesos }}</strong>
+                  <p class="suave">Registrá el pago o confirmá que se entrega igual.</p>
+                </div>
+                <div class="acciones">
+                  <button type="button" class="btn btn-oscuro" [disabled]="ocupado()"
+                          (click)="saldoAlEntregar.set(null); abrirFormPago(true)">Registrar pago</button>
+                  <button type="button" class="btn-peligro" [disabled]="ocupado()"
+                          (click)="entregarConSaldoPendiente()">Entregar con saldo pendiente</button>
+                  <button type="button" class="btn-texto" (click)="saldoAlEntregar.set(null)">Volver</button>
+                </div>
+              </div>
+            }
           </div>
 
           <aside class="lateral">
@@ -400,6 +451,7 @@ export class OrdenPagina implements OnInit {
   readonly tipos = TIPOS_ITEM;
   readonly medios = MEDIOS_PAGO;
   readonly texto = textoAccion;
+  readonly pasos = PASOS;
 
   diagnostico = '';
   nota = '';
@@ -409,6 +461,7 @@ export class OrdenPagina implements OnInit {
   precioItem: number | null = null;
 
   mostrandoFormPago = signal(false);
+  mostrarOpcionesPago = signal(false);
   medioPago: MedioPago = 'efectivo';
   montoPago: number | null = null;
   fechaPago = '';
@@ -444,10 +497,22 @@ export class OrdenPagina implements OnInit {
     return p && o.estados_siguientes.includes(p) ? p : null;
   });
 
+  /** Índice del paso en el stepper, considerando que diagnostico y esperando_aprobacion se muestran igual. */
+  indiceActual = computed(() => {
+    const o = this.orden();
+    if (!o) return -1;
+    return PASOS.findIndex((p) => p.incluye.includes(o.estado));
+  });
+
   secundarios = computed(() => {
     const o = this.orden();
     if (!o) return [];
-    return o.estados_siguientes.filter((e) => e !== 'cancelada' && e !== this.principal());
+    // Diagnostico y esperando_aprobacion se muestran como el mismo paso del stepper,
+    // así que no ofrecemos un botón para volver entre ellos.
+    const mismoPaso = (e: EstadoOrden) =>
+      (o.estado === 'esperando_aprobacion' && e === 'diagnostico') ||
+      (o.estado === 'diagnostico' && e === 'esperando_aprobacion');
+    return o.estados_siguientes.filter((e) => e !== 'cancelada' && e !== this.principal() && !mismoPaso(e));
   });
 
   nombreVehiculo = computed(() => {
@@ -668,17 +733,19 @@ export class OrdenPagina implements OnInit {
     this.api.registrarAviso(this.orden()!.id, plantilla).then(() => this.cargar()).catch(() => undefined);
   }
 
-  abrirFormPago() {
+  abrirFormPago(precargarSaldo = true) {
     const o = this.orden();
     this.medioPago = 'efectivo';
-    this.montoPago = o && Number(o.saldo) > 0 ? Number(o.saldo) : null;
+    this.montoPago = precargarSaldo && o && Number(o.saldo) > 0 ? Number(o.saldo) : null;
     this.fechaPago = this.hoyIso();
     this.notaPago = '';
+    this.mostrarOpcionesPago.set(false);
     this.mostrandoFormPago.set(true);
   }
 
   cerrarFormPago() {
     this.mostrandoFormPago.set(false);
+    this.mostrarOpcionesPago.set(false);
   }
 
   puedeCobrar() {

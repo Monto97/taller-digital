@@ -30,6 +30,50 @@
 @media (max-width: 640px) {
   .acciones .btn { width: 100%; }
 }
+.nota-estado { margin-top: 10px; }
+.cancelar { margin-top: 12px; color: var(--rojo); }
+
+/* Stepper visual del progreso de la orden */
+.stepper {
+  list-style: none; margin: 0 0 6px; padding: 0;
+  display: flex; align-items: flex-start; gap: 0;
+  overflow-x: auto;
+}
+.stepper-paso {
+  position: relative; flex: 1 1 0;
+  display: flex; flex-direction: column; align-items: center;
+  min-width: 68px; padding: 0 4px;
+  color: var(--texto-suave); font-size: .82rem; font-weight: 500;
+}
+.stepper-paso + .stepper-paso::before {
+  content: ''; position: absolute; left: calc(-50% + 16px); right: calc(50% + 16px); top: 13px;
+  height: 2px; background: var(--linea);
+}
+.stepper-paso.hecho + .stepper-paso::before,
+.stepper-paso.actual::before { background: var(--verde-oscuro, #2d7a4a); }
+.stepper-punto {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border-radius: 50%;
+  background: var(--superficie); border: 2px solid var(--linea);
+  font: 600 .85rem var(--fuente-angosta); color: var(--texto-suave);
+  margin-bottom: 6px;
+  position: relative; z-index: 1;
+}
+.stepper-paso.actual .stepper-punto {
+  background: var(--ambar, #f0b84a); border-color: var(--ambar, #f0b84a); color: #000;
+}
+.stepper-paso.hecho .stepper-punto {
+  background: var(--verde-oscuro, #2d7a4a); border-color: var(--verde-oscuro, #2d7a4a); color: #fff;
+}
+.stepper-paso.actual .stepper-texto,
+.stepper-paso.hecho .stepper-texto { color: var(--texto); }
+.stepper-paso.actual .stepper-texto { font-weight: 700; }
+.stepper-texto { text-align: center; line-height: 1.15; }
+
+@media (max-width: 520px) {
+  .stepper-texto { font-size: .72rem; }
+  .stepper-paso { min-width: 56px; }
+}
 
 /* Presupuesto */
 .titulo-fila { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
@@ -73,14 +117,25 @@
   padding: 11px 0; border-bottom: 1px solid var(--linea);
 }
 .pagos li:first-child { padding-top: 0; }
-.monto-fecha { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
-@media (min-width: 640px) {
-  .monto-fecha { grid-template-columns: minmax(180px, 260px) minmax(160px, 200px); }
+
+.resumen-pagos {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px; padding: 14px; background: var(--fondo); border-radius: var(--radio);
 }
-.monto-fecha .btn-texto { align-self: flex-start; padding: 0; min-height: 32px; text-align: left; }
+.resumen-celda { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.resumen-etiqueta { font-size: .78rem; color: var(--texto-suave); font-weight: 500; text-transform: uppercase; letter-spacing: .5px; }
+.resumen-monto { font: 700 1.25rem var(--fuente-angosta); color: var(--texto); }
+.resumen-monto.cobrado { color: var(--verde-oscuro, #2d7a4a); }
+.resumen-monto.saldo-deuda { color: var(--rojo); }
+.resumen-monto.saldo-ok { color: var(--verde-oscuro, #2d7a4a); }
+@media (max-width: 420px) {
+  .resumen-monto { font-size: 1.05rem; }
+}
+
+.pago-acciones { display: flex; flex-direction: column; gap: 8px; align-items: stretch; }
+.pago-acciones .btn-texto { align-self: center; }
+.monto-corto { max-width: 220px; }
 .opciones .opcion { white-space: nowrap; }
-.total-pagos { padding-top: 4px; font-size: 1rem; }
-.total-pagos span:last-child { font: 700 1.2rem var(--fuente-angosta); }
 
 .aviso-saldo {
   display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px;

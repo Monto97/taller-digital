@@ -176,7 +176,7 @@ type ModoDueno = 'cerrado' | 'buscar' | 'nuevo';
                   @if (o.km_ingreso) { <span class="suave">{{ o.km_ingreso | km }}</span> }
                 </div>
                 <div class="trabajo">
-                  <a [routerLink]="['/ordenes', o.id]" class="motivo">{{ o.motivo }}</a>
+                  <a [routerLink]="['/ordenes', o.id]" class="motivo">{{ o.motivo || 'Ver orden n.º ' + o.numero }}</a>
                   @if (o.estado !== 'entregado') {
                     <span class="estado estado-{{ o.estado }}">{{ etiqueta[o.estado] }}</span>
                   }

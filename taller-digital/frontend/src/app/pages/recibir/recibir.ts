@@ -93,9 +93,9 @@ type Paso = 'patente' | 'datos' | 'listo';
             @if (!vehiculo()?.orden_activa) {
               <div class="panel pila">
                 <div class="campo">
-                  <label for="motivo">¿Qué le pasa o qué hay que hacerle?</label>
+                  <label for="motivo">¿Qué le pasa o qué hay que hacerle? <span class="suave">(opcional)</span></label>
                   <textarea id="motivo" name="motivo" class="textarea" placeholder="Ej: hace ruido al frenar, service de 10.000 km"
-                            [(ngModel)]="motivo" required></textarea>
+                            [(ngModel)]="motivo"></textarea>
                 </div>
                 <div class="campo km">
                   <label for="km">Kilómetros</label>
@@ -213,8 +213,7 @@ export class Recibir implements OnInit {
   }
 
   puedeRecibir() {
-    const motivoOk = this.motivo.trim().length >= 3;
-    return this.vehiculo() ? motivoOk : motivoOk && this.clienteNombre.trim().length >= 2;
+    return this.vehiculo() ? true : this.clienteNombre.trim().length >= 2;
   }
 
   async recibir() {
