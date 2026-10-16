@@ -8,6 +8,11 @@ const ESTADOS = ['recibido', 'diagnostico', 'esperando_aprobacion', 'en_reparaci
 const ESTADOS_ACTIVOS = ['recibido', 'diagnostico', 'esperando_aprobacion', 'en_reparacion', 'listo'];
 const ESTADOS_CERRADOS = ['entregado', 'cancelada'];
 
+// Estados en los que puede nacer una orden. Al recibir el vehículo el taller ya sabe
+// si hay que revisarlo (diagnostico) o si el trabajo ya está claro (en_reparacion);
+// obligar a pasar por diagnóstico sería anotar un paso que nunca ocurrió.
+const ESTADOS_INICIALES = ['recibido', 'diagnostico', 'en_reparacion'];
+
 const ETIQUETAS = {
   recibido: 'Recibido',
   diagnostico: 'En diagnóstico',
@@ -34,4 +39,4 @@ function puedeTransicionar(desde, hasta) {
   return (TRANSICIONES[desde] || []).includes(hasta);
 }
 
-module.exports = { ESTADOS, ESTADOS_ACTIVOS, ESTADOS_CERRADOS, ETIQUETAS, TRANSICIONES, puedeTransicionar };
+module.exports = { ESTADOS, ESTADOS_ACTIVOS, ESTADOS_CERRADOS, ESTADOS_INICIALES, ETIQUETAS, TRANSICIONES, puedeTransicionar };

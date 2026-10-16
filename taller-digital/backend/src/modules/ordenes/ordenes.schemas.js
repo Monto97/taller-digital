@@ -1,7 +1,7 @@
 const { z } = require('zod');
 const { paginacion, textoOpcional } = require('../../utils/esquemas');
 const vehiculosSchemas = require('../vehiculos/vehiculos.schemas');
-const { ESTADOS } = require('./ordenes.estados');
+const { ESTADOS, ESTADOS_INICIALES } = require('./ordenes.estados');
 
 const fechaOpcional = z
   .union([z.iso.date('Fecha inválida, usá AAAA-MM-DD.'), z.literal('')])
@@ -17,6 +17,8 @@ const crear = z
     km_ingreso: z.coerce.number().int().min(0).max(2_000_000).nullish(),
     mecanico_id: idOpcional,
     fecha_estimada_entrega: fechaOpcional,
+    // Al recibir, el taller ya sabe si hay que revisarlo o si el trabajo está claro.
+    estado_inicial: z.enum(ESTADOS_INICIALES, 'Estado inicial inválido.').default('recibido'),
   })
   .superRefine((d, ctx) => {
     if (!d.vehiculo_id === !d.vehiculo) {

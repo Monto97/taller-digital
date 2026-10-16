@@ -28,6 +28,8 @@ export interface DatosNuevaOrden {
   vehiculo?: DatosNuevoVehiculo;
   motivo: string;
   km_ingreso?: number | null;
+  /** 'en_reparacion' si el trabajo ya está claro, 'diagnostico' si hay que revisarlo. */
+  estado_inicial?: EstadoOrden;
 }
 
 export interface DatosEditarVehiculo {

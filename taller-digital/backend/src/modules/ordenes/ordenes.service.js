@@ -161,6 +161,7 @@ function armarWhatsapp(datos, plantilla) {
 
 async function crear(auth, datos) {
   const { tallerId, usuarioId } = auth;
+  const estadoInicial = datos.estado_inicial ?? 'recibido';
 
   const id = await withTransaction(async (conn) => {
     let vehiculoId = datos.vehiculo_id;
@@ -182,16 +183,16 @@ async function crear(auth, datos) {
 
     const [res] = await conn.query(
       `INSERT INTO ordenes (taller_id, numero, vehiculo_id, cliente_id, mecanico_id, motivo, km_ingreso,
-                            fecha_estimada_entrega, token_publico)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                            fecha_estimada_entrega, estado, token_publico)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         tallerId, numero, vehiculoId, clienteId, datos.mecanico_id ?? null, datos.motivo, datos.km_ingreso ?? null,
-        datos.fecha_estimada_entrega ?? null, crypto.randomBytes(16).toString('hex'),
+        datos.fecha_estimada_entrega ?? null, estadoInicial, crypto.randomBytes(16).toString('hex'),
       ],
     );
 
     await actualizarKmVehiculo(conn, vehiculoId, datos.km_ingreso);
-    await registrarEvento(conn, res.insertId, usuarioId, 'creada', { hasta: 'recibido' });
+    await registrarEvento(conn, res.insertId, usuarioId, 'creada', { hasta: estadoInicial });
     return res.insertId;
   });
 

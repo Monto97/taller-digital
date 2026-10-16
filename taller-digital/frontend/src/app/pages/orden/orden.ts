@@ -7,7 +7,9 @@ import { CantidadPipe, CuandoPipe, ETIQUETA_ESTADO, KmPipe, Patente, PesosPipe, 
 
 /** El paso que conviene destacar en cada estado: el botón grande. */
 const SIGUIENTE_PRINCIPAL: Partial<Record<EstadoOrden, EstadoOrden>> = {
-  recibido: 'diagnostico',
+  // Desde "recibido" la reparación es el caso más común: la mayoría de las veces
+  // no hay nada que diagnosticar. El diagnóstico queda como la otra opción, con el mismo peso.
+  recibido: 'en_reparacion',
   diagnostico: 'en_reparacion',
   esperando_aprobacion: 'en_reparacion',
   en_reparacion: 'listo',
@@ -83,7 +85,7 @@ const MEDIOS_PAGO: { valor: MedioPago; texto: string }[] = [
 
               @if (o.estado !== 'cancelada') {
                 <ol class="stepper" aria-label="Progreso de la orden">
-                  @for (paso of pasos; track paso.clave; let i = $index) {
+                  @for (paso of pasos(); track paso.clave; let i = $index) {
                     <li class="stepper-paso"
                         [class.hecho]="indiceActual() > i"
                         [class.actual]="indiceActual() === i">
@@ -110,7 +112,10 @@ const MEDIOS_PAGO: { valor: MedioPago; texto: string }[] = [
                     </button>
                   }
                   @for (e of secundarios(); track e) {
-                    <button type="button" class="btn btn-borde" [disabled]="ocupado()" (click)="mover(e)">
+                    <button type="button" class="btn"
+                            [class.btn-primario]="secundariosDestacados()"
+                            [class.btn-borde]="!secundariosDestacados()"
+                            [disabled]="ocupado()" (click)="mover(e)">
                       {{ texto(o.estado, e) }}
                     </button>
                   }
@@ -451,7 +456,19 @@ export class OrdenPagina implements OnInit {
   readonly tipos = TIPOS_ITEM;
   readonly medios = MEDIOS_PAGO;
   readonly texto = textoAccion;
-  readonly pasos = PASOS;
+  /**
+   * El paso "Diagnóstico" solo se muestra si realmente ocurrió: una orden que nació
+   * en reparación nunca lo pasó, y marcarlo con ✓ sería anotar algo que no pasó.
+   */
+  pasos = computed(() => {
+    const o = this.orden();
+    if (!o) return PASOS;
+    const hubo = Boolean(o.diagnostico?.trim()) || ['recibido', 'diagnostico', 'esperando_aprobacion'].includes(o.estado);
+    return hubo ? PASOS : PASOS.filter((p) => p.clave !== 'diagnostico');
+  });
+
+  /** En "recibido" ninguna de las dos acciones es "la" correcta: van con el mismo peso. */
+  secundariosDestacados = computed(() => this.orden()?.estado === 'recibido');
 
   diagnostico = '';
   nota = '';
@@ -501,7 +518,7 @@ export class OrdenPagina implements OnInit {
   indiceActual = computed(() => {
     const o = this.orden();
     if (!o) return -1;
-    return PASOS.findIndex((p) => p.incluye.includes(o.estado));
+    return this.pasos().findIndex((p) => p.incluye.includes(o.estado));
   });
 
   secundarios = computed(() => {
@@ -789,7 +806,10 @@ export class OrdenPagina implements OnInit {
 
   textoEvento(e: Evento): string {
     switch (e.tipo) {
-      case 'creada': return 'Recibido en el taller';
+      case 'creada':
+        return e.estado_hasta && e.estado_hasta !== 'recibido'
+          ? 'Recibido en el taller, ' + ETIQUETA_ESTADO[e.estado_hasta].toLowerCase()
+          : 'Recibido en el taller';
       case 'cambio_estado': return `Pasó a ${ETIQUETA_ESTADO[e.estado_hasta!].toLowerCase()}${e.detalle ? `: ${e.detalle}` : ''}`;
       case 'presupuesto_enviado': return 'Se envió el presupuesto';
       case 'presupuesto_aprobado': return e.detalle === 'Aprobado por el taller' ? 'Presupuesto aprobado por teléfono' : 'El cliente aprobó el presupuesto';

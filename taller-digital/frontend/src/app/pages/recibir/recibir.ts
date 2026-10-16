@@ -2,8 +2,8 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ApiService, DatosNuevaOrden, errorDe } from '../../core/api.service';
-import { Orden, TipoVehiculo, Vehiculo } from '../../core/modelos';
-import { KmPipe, Patente, nombreVehiculo, normalizarPatente } from '../../shared/compartido';
+import { EstadoOrden, Orden, TipoVehiculo, Vehiculo } from '../../core/modelos';
+import { ETIQUETA_ESTADO, KmPipe, Patente, nombreVehiculo, normalizarPatente } from '../../shared/compartido';
 
 type Paso = 'patente' | 'datos' | 'listo';
 
@@ -33,7 +33,7 @@ type Paso = 'patente' | 'datos' | 'listo';
         }
 
         @case ('datos') {
-          <form class="pila" (ngSubmit)="recibir()">
+          <form class="pila">
             <div class="panel pila">
               <div class="cabecera">
                 <app-patente [valor]="patenteNormalizada()" [tipo]="vehiculo()?.tipo ?? tipo" [grande]="true" />
@@ -114,9 +114,20 @@ type Paso = 'patente' | 'datos' | 'listo';
                 </p>
               }
 
-              <button type="submit" class="btn btn-primario btn-ancho" [disabled]="!puedeRecibir() || ocupado()">
-                {{ ocupado() ? 'Guardando…' : 'Recibir vehículo' }}
-              </button>
+              <div class="campo">
+                <span class="etiqueta" id="arranque-label">¿Ya sabés qué hay que hacerle?</span>
+                <div class="arranque" role="group" aria-labelledby="arranque-label">
+                  <button type="button" class="btn btn-primario btn-ancho" [disabled]="!puedeRecibir() || ocupado()"
+                          (click)="recibir('en_reparacion')">
+                    {{ elegido() === 'en_reparacion' ? 'Guardando…' : 'Sí, ya sé qué hacerle' }}
+                  </button>
+                  <button type="button" class="btn btn-primario btn-ancho" [disabled]="!puedeRecibir() || ocupado()"
+                          (click)="recibir('diagnostico')">
+                    {{ elegido() === 'diagnostico' ? 'Guardando…' : 'No, hay que revisarlo primero' }}
+                  </button>
+                </div>
+                <span class="ayuda">Si lo revisás primero, después cargás el diagnóstico. Se puede cambiar desde la orden.</span>
+              </div>
             }
           </form>
         }
@@ -126,7 +137,7 @@ type Paso = 'patente' | 'datos' | 'listo';
             <div class="panel pila centrado">
               <app-patente [valor]="o.vehiculo.patente" [tipo]="o.vehiculo.tipo" [grande]="true" />
               <h1>Ya está en el taller</h1>
-              <p class="suave">Orden n.º {{ o.numero }}. Aparece en el tablero como recibido.</p>
+              <p class="suave">Orden n.º {{ o.numero }}. Aparece en el tablero como {{ textoEstado(o.estado) }}.</p>
 
               @if (o.whatsapp_url) {
                 <a class="btn btn-whatsapp btn-ancho" [href]="o.whatsapp_url" target="_blank" rel="noopener" (click)="avisar(o)">
@@ -152,6 +163,7 @@ type Paso = 'patente' | 'datos' | 'listo';
     }
     .patente-input::placeholder { color: #c3c9ce; }
     .km { max-width: 220px; }
+    .arranque { display: flex; flex-direction: column; gap: 10px; }
     .centrado { align-items: center; text-align: center; }
   `,
 })
@@ -166,6 +178,8 @@ export class Recibir implements OnInit {
   creada = signal<Orden | null>(null);
   ocupado = signal(false);
   error = signal('');
+  /** Cuál de los dos botones se tocó, para mostrar "Guardando…" solo en ese. */
+  elegido = signal<EstadoOrden | null>(null);
   patenteInvalida = signal(false);
   patenteNormalizada = signal('');
 
@@ -216,9 +230,17 @@ export class Recibir implements OnInit {
     return this.vehiculo() ? true : this.clienteNombre.trim().length >= 2;
   }
 
-  async recibir() {
+  /**
+   * El estado inicial lo decide el taller acá, que es cuando sabe la respuesta:
+   * si hay que revisarlo arranca en diagnóstico, si no, derecho a reparación.
+   */
+  async recibir(estadoInicial: EstadoOrden) {
     const v = this.vehiculo();
-    const datos: DatosNuevaOrden = { motivo: this.motivo.trim(), km_ingreso: this.km || null };
+    const datos: DatosNuevaOrden = {
+      motivo: this.motivo.trim(),
+      km_ingreso: this.km || null,
+      estado_inicial: estadoInicial,
+    };
     if (v) {
       datos.vehiculo_id = v.id;
     } else {
@@ -233,6 +255,7 @@ export class Recibir implements OnInit {
     }
 
     this.ocupado.set(true);
+    this.elegido.set(estadoInicial);
     this.error.set('');
     try {
       this.creada.set(await this.api.crearOrden(datos));
@@ -244,7 +267,12 @@ export class Recibir implements OnInit {
       this.error.set(detallePatente ? String(detallePatente) : e.mensaje);
     } finally {
       this.ocupado.set(false);
+      this.elegido.set(null);
     }
+  }
+
+  textoEstado(estado: EstadoOrden) {
+    return ETIQUETA_ESTADO[estado].toLowerCase();
   }
 
   /** El link lo abre el navegador; acá solo queda registrado en la bitácora. */

@@ -211,8 +211,14 @@ export class Seguimiento implements OnInit {
   pasos = computed<Paso[]>(() => {
     const d = this.datos();
     if (!d) return [];
-    // El paso de aprobación solo aparece si hubo presupuesto.
-    const estados = ORDEN_PASOS.filter((e) => e !== 'esperando_aprobacion' || d.presupuesto);
+    // El paso de aprobación solo aparece si hubo presupuesto, y el de diagnóstico solo si
+    // la orden pasó por ahí: si entró derecho a reparación, mostrarlo sería prometer algo que no pasó.
+    const paso = (e: EstadoOrden) => d.orden.estado === e || d.linea_de_tiempo.some((x) => x.estado === e);
+    const estados = ORDEN_PASOS.filter((e) => {
+      if (e === 'esperando_aprobacion') return Boolean(d.presupuesto);
+      if (e === 'diagnostico') return paso('diagnostico');
+      return true;
+    });
     const actual = estados.indexOf(d.orden.estado);
     return estados.map((estado, i) => {
       const ultimo = [...d.linea_de_tiempo].reverse().find((e) => e.estado === estado);
