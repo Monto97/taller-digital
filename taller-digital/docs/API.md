@@ -93,7 +93,7 @@ Devuelve el usuario y el taller del token.
 | Método | Ruta | Descripción |
 |---|---|---|
 | GET | `/taller` | Datos del taller. |
-| PATCH | `/taller` 🔒 | Actualiza nombre, teléfono, dirección o logo. |
+| PATCH | `/taller` 🔒 | Actualiza `nombre`, `telefono` y/o `direccion` (`""` o `null` borran teléfono y dirección). El slug no cambia. |
 | GET | `/usuarios` 🔒 | Lista usuarios del taller. |
 | POST | `/usuarios` 🔒 | Crea un mecánico: `{ nombre, email, password, rol }`. |
 | PATCH | `/usuarios/:id` 🔒 | Edita nombre, rol o `activo`. |

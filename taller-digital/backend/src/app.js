@@ -16,6 +16,7 @@ const publicoRoutes = require('./modules/publico/publico.routes');
 const adminRoutes = require('./modules/admin/admin.routes');
 const numerosRoutes = require('./modules/numeros/numeros.routes');
 const mpRoutes = require('./modules/mercadopago/mp.routes');
+const tallerRoutes = require('./modules/taller/taller.routes');
 
 const app = express();
 
@@ -43,6 +44,7 @@ app.use('/api/vehiculos', requireAuth, vehiculosRoutes);
 app.use('/api/ordenes', requireAuth, ordenesRouter);
 app.use('/api/tablero', requireAuth, tableroRouter);
 app.use('/api/numeros', requireAuth, numerosRoutes);
+app.use('/api/taller', requireAuth, tallerRoutes);
 // Mercado Pago: /api/mp/url, /estado, /conexion requieren login (lo pide cada ruta).
 // /api/mp/oauth/callback es público porque lo llama MP tras autorizar.
 app.use('/api/mp', mpRoutes.autenticadas);

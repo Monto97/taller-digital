@@ -1,5 +1,6 @@
 import { Component, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { ApiService } from '../core/api.service';
 import { AuthService } from '../core/auth';
 import { AvisoInstalar } from '../core/instalacion';
 
@@ -77,4 +78,11 @@ import { AvisoInstalar } from '../core/instalacion';
 })
 export class Marco {
   protected auth = inject(AuthService);
+  private api = inject(ApiService);
+
+  constructor() {
+    // El nombre del taller queda guardado con la sesión. Si el dueño lo cambió desde
+    // otro dispositivo, lo traemos de nuevo para que la barra muestre el actual.
+    this.api.taller().then((t) => this.auth.actualizarTaller(t)).catch(() => {});
+  }
 }

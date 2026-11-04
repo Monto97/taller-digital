@@ -7,3 +7,4 @@ backend/tests
 docs
 *.md
 .git
+**/backups

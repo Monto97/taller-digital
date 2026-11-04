@@ -28,6 +28,13 @@ export class AuthService {
     this.guardar(await this.api.registro(datos));
   }
 
+  /** Después de editar el taller en Ajustes: refleja el nombre nuevo en la barra sin volver a ingresar. */
+  actualizarTaller(taller: Sesion['taller']) {
+    const actual = this.sesion();
+    if (!actual || (actual.taller.nombre === taller.nombre && actual.taller.slug === taller.slug)) return;
+    this.guardar({ ...actual, taller: { id: taller.id, nombre: taller.nombre, slug: taller.slug } });
+  }
+
   private guardar(sesion: Sesion) {
     localStorage.setItem(CLAVE, JSON.stringify(sesion));
     this.sesion.set(sesion);

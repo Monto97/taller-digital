@@ -8,7 +8,8 @@
     "start": "node src/server.js",
     "test": "node --test --test-concurrency=1 \"tests/**/*.test.js\"",
     "db:init": "node scripts/init-db.js",
-    "crear-taller": "node scripts/crear-taller.js"
+    "crear-taller": "node scripts/crear-taller.js",
+    "limpiar-datos": "node scripts/limpiar-datos-viejos.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

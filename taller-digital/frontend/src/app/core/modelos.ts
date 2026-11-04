@@ -29,6 +29,13 @@ export interface Taller {
   slug: string;
 }
 
+/** Datos completos del taller, para la pantalla de Ajustes. */
+export interface DatosTaller extends Taller {
+  telefono: string | null;
+  direccion: string | null;
+  logo_url: string | null;
+}
+
 export interface Sesion {
   token: string;
   usuario: Usuario;

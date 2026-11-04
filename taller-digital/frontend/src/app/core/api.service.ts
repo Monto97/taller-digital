@@ -2,7 +2,7 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import {
-  AdminResumen, AdminTaller, ClienteResumen, EntregaReciente, ErrorApi, EstadoOrden, MedioPago, MpEstado, Orden, OrdenHistorial, OrdenPublica, PanelNumeros, PlantillaWhatsapp, Sesion, Tablero, TipoItem, TipoVehiculo, Vehiculo,
+  AdminResumen, AdminTaller, ClienteResumen, DatosTaller, EntregaReciente, ErrorApi, EstadoOrden, MedioPago, MpEstado, Orden, OrdenHistorial, OrdenPublica, PanelNumeros, PlantillaWhatsapp, Sesion, Tablero, TipoItem, TipoVehiculo, Vehiculo,
 } from './modelos';
 
 /** En desarrollo el proxy de Angular manda /api al backend (ver proxy.conf.json). */
@@ -194,6 +194,14 @@ export class ApiService {
   }
   adminHabilitar(id: number, activo: boolean) {
     return this.patch<AdminTaller>(`/admin/talleres/${id}`, { activo });
+  }
+
+  // Datos del propio taller (Ajustes)
+  taller() {
+    return this.get<DatosTaller>('/taller');
+  }
+  editarTaller(datos: { nombre?: string; telefono?: string | null; direccion?: string | null }) {
+    return this.patch<DatosTaller>('/taller', datos);
   }
 
   // Mercado Pago
