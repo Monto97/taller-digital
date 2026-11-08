@@ -10,6 +10,14 @@ const authService = require('../auth/auth.service');
  */
 const HOY_AR = 'DATE(UTC_TIMESTAMP() - INTERVAL 3 HOUR)';
 
+// Los autos de ejemplo que se cargan al registrarse no son uso real: se excluyen de todas las cuentas.
+const ORDENES = `(SELECT ord.* FROM ordenes ord
+                    JOIN clientes cli ON cli.id = ord.cliente_id
+                   WHERE cli.es_ejemplo = 0)`;
+const VEHICULOS = `(SELECT veh.* FROM vehiculos veh
+                      JOIN clientes cli ON cli.id = veh.cliente_id
+                     WHERE cli.es_ejemplo = 0)`;
+
 async function resumen() {
   const [[talleres]] = await pool.query(
     `SELECT
@@ -18,11 +26,11 @@ async function resumen() {
        SUM(created_at >= UTC_TIMESTAMP() - INTERVAL 30 DAY) AS nuevos_30d,
        -- Activo = movió alguna orden en los últimos 7 días
        SUM(EXISTS (
-         SELECT 1 FROM ordenes o JOIN orden_eventos e ON e.orden_id = o.id
+         SELECT 1 FROM ${ORDENES} o JOIN orden_eventos e ON e.orden_id = o.id
           WHERE o.taller_id = t.id AND e.created_at >= UTC_TIMESTAMP() - INTERVAL 7 DAY
        )) AS activos_7d,
        -- Arrancaron = cargaron al menos una orden
-       SUM(EXISTS (SELECT 1 FROM ordenes o WHERE o.taller_id = t.id)) AS con_ordenes
+       SUM(EXISTS (SELECT 1 FROM ${ORDENES} o WHERE o.taller_id = t.id)) AS con_ordenes
      FROM talleres t`,
   );
 
@@ -38,7 +46,7 @@ async function resumen() {
        SUM(presupuesto_estado IN ('enviado', 'aprobado', 'rechazado')) AS presupuestos_enviados,
        SUM(presupuesto_estado = 'aprobado') AS presupuestos_aprobados,
        SUM(presupuesto_estado = 'rechazado') AS presupuestos_rechazados
-     FROM ordenes`,
+     FROM ${ORDENES} o`,
   );
 
   const [[eventos]] = await pool.query(
@@ -50,15 +58,15 @@ async function resumen() {
   );
 
   const [[base]] = await pool.query(
-    `SELECT (SELECT COUNT(*) FROM vehiculos WHERE deleted_at IS NULL) AS vehiculos,
-            (SELECT COUNT(*) FROM clientes WHERE deleted_at IS NULL) AS clientes,
+    `SELECT (SELECT COUNT(*) FROM ${VEHICULOS} v WHERE v.deleted_at IS NULL) AS vehiculos,
+            (SELECT COUNT(*) FROM clientes WHERE deleted_at IS NULL AND es_ejemplo = 0) AS clientes,
             (SELECT COUNT(*) FROM usuarios WHERE activo = 1) AS usuarios`,
   );
 
   // Órdenes por día de los últimos 30 días, con los días sin órdenes en 0.
   const [porDia] = await pool.query(
     `SELECT DATE_FORMAT(DATE(fecha_ingreso - INTERVAL 3 HOUR), '%Y-%m-%d') AS dia, COUNT(*) AS ordenes
-       FROM ordenes
+       FROM ${ORDENES} o
       WHERE fecha_ingreso >= ${HOY_AR} - INTERVAL 29 DAY + INTERVAL 3 HOUR
       GROUP BY dia`,
   );
@@ -108,13 +116,13 @@ async function talleres() {
             (SELECT u.email FROM usuarios u WHERE u.taller_id = t.id AND u.rol = 'dueno' ORDER BY u.id LIMIT 1) AS dueno_email,
             (SELECT COUNT(*) FROM usuarios u WHERE u.taller_id = t.id AND u.activo = 1) AS usuarios,
             (SELECT MAX(u.ultimo_login_at) FROM usuarios u WHERE u.taller_id = t.id) AS ultimo_ingreso,
-            (SELECT COUNT(*) FROM ordenes o WHERE o.taller_id = t.id) AS ordenes,
-            (SELECT COUNT(*) FROM ordenes o WHERE o.taller_id = t.id AND o.fecha_ingreso >= UTC_TIMESTAMP() - INTERVAL 7 DAY) AS ordenes_7d,
-            (SELECT COUNT(*) FROM ordenes o WHERE o.taller_id = t.id AND o.estado IN
+            (SELECT COUNT(*) FROM ${ORDENES} o WHERE o.taller_id = t.id) AS ordenes,
+            (SELECT COUNT(*) FROM ${ORDENES} o WHERE o.taller_id = t.id AND o.fecha_ingreso >= UTC_TIMESTAMP() - INTERVAL 7 DAY) AS ordenes_7d,
+            (SELECT COUNT(*) FROM ${ORDENES} o WHERE o.taller_id = t.id AND o.estado IN
                ('recibido', 'diagnostico', 'esperando_aprobacion', 'en_reparacion', 'listo')) AS en_taller,
-            (SELECT COUNT(*) FROM vehiculos v WHERE v.taller_id = t.id AND v.deleted_at IS NULL) AS vehiculos,
-            (SELECT COALESCE(SUM(o.total), 0) FROM ordenes o WHERE o.taller_id = t.id AND o.estado = 'entregado') AS monto_entregado,
-            (SELECT MAX(e.created_at) FROM orden_eventos e JOIN ordenes o ON o.id = e.orden_id WHERE o.taller_id = t.id)
+            (SELECT COUNT(*) FROM ${VEHICULOS} v WHERE v.taller_id = t.id AND v.deleted_at IS NULL) AS vehiculos,
+            (SELECT COALESCE(SUM(o.total), 0) FROM ${ORDENES} o WHERE o.taller_id = t.id AND o.estado = 'entregado') AS monto_entregado,
+            (SELECT MAX(e.created_at) FROM orden_eventos e JOIN ${ORDENES} o ON o.id = e.orden_id WHERE o.taller_id = t.id)
               AS ultima_actividad
        FROM talleres t
       ORDER BY t.created_at DESC`,

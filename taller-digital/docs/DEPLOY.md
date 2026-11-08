@@ -52,6 +52,7 @@ Entrá al servicio de la app (no al de MySQL) → pestaña **Variables** y carg�
 | `PUBLIC_APP_URL` | La URL pública de la app (paso 4). |
 | `CORS_ORIGIN` | La misma URL pública. |
 | `ADMIN_EMAILS` | Tu email (el del usuario con el que vas a entrar). Te da acceso al panel de admin. |
+| `AVISO_REGISTRO_URL` | Opcional. `https://ntfy.sh/` + un tema que solo vos conozcas (ej. `https://ntfy.sh/taller-digital-registros-x7k2`). Te llega una notificación al celular por cada taller que se registra. |
 
 Los valores con `${{MySQL...}}` son referencias: Railway completa solo los datos de la base. Si tu servicio de base no se llama `MySQL`, cambiá esa parte por su nombre.
 
@@ -89,6 +90,16 @@ Entrá con tu usuario (el de `ADMIN_EMAILS`): en el menú aparece **Admin**. Ah�
 - **Deshabilitar** un taller (por ejemplo, si deja de pagar): no puede entrar y se le cierran las sesiones abiertas. Se vuelve a habilitar con un clic, sin perder datos.
 
 Para dar acceso de admin a otra persona, sumá su email a `ADMIN_EMAILS` separado por coma. Para quitárselo, sacalo de la lista: el acceso se corta al instante.
+
+Los talleres que se registraron en los últimos 3 días aparecen con la marca **Nuevo**. Los autos de ejemplo que trae cada registro no cuentan en ninguna métrica: un taller figura como "arrancó" recién cuando carga su primera orden real.
+
+### Aviso al celular cuando se registra un taller
+
+1. Instalá la app **ntfy** (Android o iPhone, es gratis).
+2. Inventá un tema difícil de adivinar, por ejemplo `taller-digital-registros-x7k2`, y suscribite a ese tema en la app.
+3. En Railway cargá `AVISO_REGISTRO_URL=https://ntfy.sh/taller-digital-registros-x7k2`.
+
+Cada vez que alguien se registre desde `/registro` te llega una notificación con el nombre del taller, el dueño y su WhatsApp. Al tocarla se abre el chat con él. Si ntfy no responde, el registro igual se completa.
 
 ## 6. Dejarlo en el celular del taller
 

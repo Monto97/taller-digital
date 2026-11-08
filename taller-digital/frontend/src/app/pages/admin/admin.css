@@ -77,3 +77,9 @@ h2 { margin-bottom: 12px; }
   .sub { display: inline; margin-left: 6px; }
   .tabla td:first-child .sub { display: block; margin: 0; }
 }
+
+.nuevo {
+  display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 99px; vertical-align: 2px;
+  font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px;
+  background: var(--ambar); color: var(--grafito);
+}

@@ -42,6 +42,9 @@ const schema = z.object({
   // Secreto para validar la firma del webhook (header x-signature). Si está vacío,
   // el webhook igual funciona (verifica cada orden contra MP), pero en producción conviene cargarlo.
   MP_WEBHOOK_SECRET: z.string().default(''),
+  // Aviso al celular cuando un taller se registra solo. Una URL de ntfy.sh con un tema
+  // que solo vos conozcas (ej. https://ntfy.sh/taller-digital-registros-x7k2). Vacío = sin aviso.
+  AVISO_REGISTRO_URL: z.string().default(''),
 });
 
 const parsed = schema.safeParse(process.env);

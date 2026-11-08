@@ -63,6 +63,8 @@ Chequea que la API y la base respondan: `{ "estado": "ok" }`. Sirve para el heal
 ### `POST /auth/registro`
 Crea un taller y su usuario dueño. Es abierto: lo usa la pantalla `/registro` del front para que cada taller cree su cuenta. Tiene el mismo límite de intentos que el login.
 
+Con `"con_ejemplos": true` (lo manda la pantalla de registro) el taller arranca con 5 autos de ejemplo repartidos en los estados del tablero, para que no entre a una pantalla vacía. Los clientes de ejemplo quedan marcados con `es_ejemplo = 1` y llevan el teléfono del taller, así un aviso de WhatsApp de prueba le llega al dueño. Se borran con `DELETE /taller/ejemplos` y no cuentan en el panel de admin. Si está configurado `AVISO_REGISTRO_URL`, cada registro manda una notificación (ver DEPLOY.md).
+
 También se puede crear un taller con `npm run crear-taller` desde `backend/`.
 
 ```json
@@ -94,6 +96,7 @@ Devuelve el usuario y el taller del token.
 |---|---|---|
 | GET | `/taller` | Datos del taller. |
 | PATCH | `/taller` 🔒 | Actualiza `nombre`, `telefono` y/o `direccion` (`""` o `null` borran teléfono y dirección). El slug no cambia. |
+| DELETE | `/taller/ejemplos` 🔒 | Borra los autos de ejemplo del registro (clientes, vehículos y órdenes con todo lo suyo). Lo cargado por el taller no se toca. Si no queda ninguna orden, la numeración vuelve a 1. Devuelve `{ "borrados": 5 }`. |
 | GET | `/usuarios` 🔒 | Lista usuarios del taller. |
 | POST | `/usuarios` 🔒 | Crea un mecánico: `{ nombre, email, password, rol }`. |
 | PATCH | `/usuarios/:id` 🔒 | Edita nombre, rol o `activo`. |
@@ -248,9 +251,12 @@ Todo lo que necesita la pantalla principal en una sola llamada.
     "esperando_aprobacion": [],
     "en_reparacion": [],
     "listo": []
-  }
+  },
+  "hay_ejemplos": false
 }
 ```
+
+Cada tarjeta trae además `es_ejemplo: true|false`. `hay_ejemplos` es `true` mientras queden autos de ejemplo del registro, aunque ya estén entregados.
 
 ---
 

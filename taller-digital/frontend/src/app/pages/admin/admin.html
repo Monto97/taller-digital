@@ -156,6 +156,7 @@
                 <tr [class.deshabilitado]="!t.activo">
                   <td data-titulo="Taller">
                     <strong>{{ t.nombre }}</strong>
+                    @if (esNuevo(t)) { <span class="nuevo">Nuevo</span> }
                     <span class="suave sub">{{ t.dueno_nombre }} · {{ t.dueno_email }}</span>
                     @if (t.telefono) { <a class="sub" [href]="'https://wa.me/' + t.telefono" target="_blank" rel="noopener">WhatsApp</a> }
                   </td>

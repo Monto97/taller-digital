@@ -146,11 +146,15 @@ export interface TarjetaTablero {
   mecanico: { id: number; nombre: string } | null;
   fecha_ingreso: string;
   fecha_estimada_entrega: string | null;
+  /** Auto cargado al registrarse para mostrar la app. */
+  es_ejemplo: boolean;
 }
 
 export interface Tablero {
   resumen: { en_taller: number; listos: number; presupuestos_sin_respuesta: number; entregados_hoy: number };
   columnas: Record<'recibido' | 'diagnostico' | 'esperando_aprobacion' | 'en_reparacion' | 'listo', TarjetaTablero[]>;
+  /** Quedan autos de ejemplo del registro (aunque estén entregados). */
+  hay_ejemplos: boolean;
 }
 
 export interface OrdenHistorial {

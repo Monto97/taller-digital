@@ -698,7 +698,7 @@ async function tablero(tallerId) {
     `SELECT o.id, o.numero, o.estado, o.presupuesto_estado, o.motivo, o.total, o.fecha_ingreso,
             o.fecha_estimada_entrega, o.presupuesto_enviado_at,
             v.patente, v.tipo, v.marca, v.modelo,
-            c.nombre AS cliente_nombre,
+            c.nombre AS cliente_nombre, c.es_ejemplo,
             u.id AS mecanico_id, u.nombre AS mecanico_nombre
        FROM ordenes o
        JOIN vehiculos v ON v.id = o.vehiculo_id
@@ -724,8 +724,15 @@ async function tablero(tallerId) {
       fecha_ingreso: f.fecha_ingreso,
       fecha_estimada_entrega: f.fecha_estimada_entrega,
       presupuesto_enviado_at: f.presupuesto_enviado_at,
+      es_ejemplo: Boolean(f.es_ejemplo),
     });
   }
+
+  // Aparte de las columnas: puede haber ejemplos ya entregados aunque ninguno siga en el taller.
+  const [[{ ejemplos }]] = await pool.query(
+    'SELECT COUNT(*) AS ejemplos FROM clientes WHERE taller_id = ? AND es_ejemplo = 1',
+    [tallerId],
+  );
 
   const [[{ entregados_hoy }]] = await pool.query(
     `SELECT COUNT(*) AS entregados_hoy FROM ordenes
@@ -743,6 +750,7 @@ async function tablero(tallerId) {
       entregados_hoy,
     },
     columnas,
+    hay_ejemplos: ejemplos > 0,
   };
 }
 

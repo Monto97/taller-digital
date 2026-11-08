@@ -44,6 +44,11 @@ export class Admin implements OnInit {
 
   readonly uso = USO;
 
+  /** Se registró en los últimos 3 días: para llamarlo mientras está probando. */
+  esNuevo(t: AdminTaller) {
+    return Date.now() - new Date(t.created_at).getTime() < 3 * 86_400_000;
+  }
+
   /** Porcentaje de presupuestos enviados que se aprobaron. */
   tasaAprobacion = computed(() => {
     const p = this.resumen()?.presupuestos;

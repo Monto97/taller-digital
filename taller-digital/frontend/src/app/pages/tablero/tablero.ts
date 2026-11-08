@@ -2,6 +2,7 @@ import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { ApiService, errorDe } from '../../core/api.service';
+import { AuthService } from '../../core/auth';
 import { Tablero as DatosTablero } from '../../core/modelos';
 import { CuandoPipe, ETIQUETA_ESTADO, Patente, PesosPipe, normalizarPatente } from '../../shared/compartido';
 
@@ -31,6 +32,20 @@ type Columna = keyof DatosTablero['columnas'];
       }
 
       @if (datos(); as d) {
+        @if (d.hay_ejemplos) {
+          <div class="ejemplos aviso aviso-info" role="note">
+            <p>
+              <strong>Estos son autos de ejemplo</strong> para que veas cómo funciona.
+              Abrí cualquiera para ver la orden, el presupuesto y el aviso por WhatsApp.
+            </p>
+            @if (esDueno()) {
+              <button type="button" class="btn btn-oscuro" [disabled]="borrando()" (click)="borrarEjemplos()">
+                {{ borrando() ? 'Borrando…' : 'Borrar ejemplos y empezar' }}
+              </button>
+            }
+          </div>
+        }
+
         <div class="resumen">
           <span><b>{{ d.resumen.en_taller }}</b> en el taller</span>
           <span><b>{{ d.resumen.listos }}</b> {{ d.resumen.listos === 1 ? 'listo' : 'listos' }} para retirar</span>
@@ -55,7 +70,10 @@ type Columna = keyof DatosTablero['columnas'];
                   <a class="tarjeta" [routerLink]="['/ordenes', t.id]" [style.--c]="colorDe(col)">
                     <div class="arriba">
                       <app-patente [valor]="t.patente" [tipo]="t.tipo" />
-                      <span class="cuando">{{ t.fecha_ingreso | cuando }}</span>
+                      <span class="cuando">
+                        @if (t.es_ejemplo) { <span class="marca-ejemplo">Ejemplo</span> }
+                        {{ t.fecha_ingreso | cuando }}
+                      </span>
                     </div>
                     <strong>{{ t.vehiculo || (t.tipo === 'moto' ? 'Moto' : 'Auto') }}</strong>
                     @if (t.motivo) { <span class="motivo">{{ t.motivo }}</span> }
@@ -108,7 +126,13 @@ type Columna = keyof DatosTablero['columnas'];
     }
     .tarjeta:hover { border-color: var(--gris); border-top-color: var(--c); }
     .arriba { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; }
-    .cuando { font-size: .8rem; color: var(--texto-suave); }
+    .cuando { font-size: .8rem; color: var(--texto-suave); display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+    .marca-ejemplo {
+      font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px;
+      padding: 2px 7px; border-radius: 99px; background: var(--ambar-suave); color: var(--texto); border: 1px solid #f3d27d;
+    }
+    .ejemplos { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+    .ejemplos p { margin: 0; flex: 1 1 320px; line-height: 1.4; }
     .motivo { font-size: .9rem; color: var(--texto-suave); line-height: 1.35; }
     .abajo { display: flex; justify-content: space-between; gap: 8px; margin-top: 6px; font-size: .85rem; color: var(--texto-suave); }
     .total { font-weight: 600; color: var(--texto); }
@@ -116,6 +140,7 @@ type Columna = keyof DatosTablero['columnas'];
 })
 export class Tablero implements OnInit, OnDestroy {
   private api = inject(ApiService);
+  private auth = inject(AuthService);
   private router = inject(Router);
   private intervalo?: ReturnType<typeof setInterval>;
 
@@ -126,6 +151,9 @@ export class Tablero implements OnInit, OnDestroy {
   datos = signal<DatosTablero | null>(null);
   error = signal('');
   patente = '';
+  borrando = signal(false);
+  /** Los ejemplos los borra solo el dueño (el backend también lo exige). */
+  esDueno = () => this.auth.usuario()?.rol === 'dueno';
 
   ngOnInit() {
     this.cargar();
@@ -143,6 +171,19 @@ export class Tablero implements OnInit, OnDestroy {
       this.error.set('');
     } catch (err) {
       this.error.set(errorDe(err).mensaje);
+    }
+  }
+
+  async borrarEjemplos() {
+    if (!confirm('¿Borrar los autos de ejemplo? Lo que cargaste vos no se toca.')) return;
+    this.borrando.set(true);
+    try {
+      await this.api.borrarEjemplos();
+      await this.cargar();
+    } catch (err) {
+      this.error.set(errorDe(err).mensaje);
+    } finally {
+      this.borrando.set(false);
     }
   }
 

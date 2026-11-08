@@ -21,6 +21,8 @@ export interface DatosNuevoVehiculo {
 export interface DatosRegistro {
   taller: { nombre: string; telefono?: string; direccion?: string };
   usuario: { nombre: string; email: string; password: string };
+  /** Carga autos de ejemplo para no arrancar con el tablero vacío. */
+  con_ejemplos?: boolean;
 }
 
 export interface DatosNuevaOrden {
@@ -126,6 +128,10 @@ export class ApiService {
   // Órdenes
   tablero() {
     return this.get<Tablero>('/tablero');
+  }
+  /** Borra los autos de ejemplo del registro (solo el dueño). */
+  borrarEjemplos() {
+    return this.delete<{ borrados: number }>('/taller/ejemplos');
   }
   numeros() {
     return this.get<PanelNumeros>('/numeros');

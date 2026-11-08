@@ -15,7 +15,10 @@ import { AuthService } from '../../core/auth';
           <span>Taller Digital</span>
         </div>
 
-        <h1>Creá tu taller</h1>
+        <div class="titulo">
+          <h1>Probá Taller Digital gratis</h1>
+          <p class="suave">Creá la cuenta de tu taller en un minuto. El primer mes es gratis y no te pedimos tarjeta.</p>
+        </div>
 
         @if (error()) {
           <p class="aviso aviso-error" role="alert">{{ error() }}</p>
@@ -29,9 +32,9 @@ import { AuthService } from '../../core/auth';
                    [(ngModel)]="tallerNombre" required />
           </div>
           <div class="campo">
-            <label for="taller-telefono">Teléfono del taller (opcional)</label>
+            <label for="taller-telefono">WhatsApp del taller</label>
             <input id="taller-telefono" name="tallerTelefono" class="input" type="tel" inputmode="tel"
-                   placeholder="2241 15 00-0000" [(ngModel)]="tallerTelefono" />
+                   autocomplete="tel" placeholder="221 15 555-0000" [(ngModel)]="tallerTelefono" required />
             <span class="ayuda">Para que tus clientes te escriban desde el link de seguimiento.</span>
           </div>
           <div class="campo">
@@ -61,8 +64,12 @@ import { AuthService } from '../../core/auth';
           </div>
         </fieldset>
 
+        <p class="aviso aviso-info">
+          Vas a entrar con algunos autos de ejemplo para que veas cómo funciona. Los borrás con un toque cuando quieras.
+        </p>
+
         <button type="submit" class="btn btn-primario btn-ancho" [disabled]="enviando() || !completo()">
-          {{ enviando() ? 'Creando tu taller…' : 'Crear mi taller' }}
+          {{ enviando() ? 'Creando tu taller…' : 'Crear mi taller gratis' }}
         </button>
 
         <p class="pie suave">¿Ya tenés cuenta? <a routerLink="/ingresar">Ingresá</a></p>
@@ -76,6 +83,9 @@ import { AuthService } from '../../core/auth';
       padding: 28px 24px; display: flex; flex-direction: column; gap: 18px;
     }
     .marca { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 1.05rem; }
+    .titulo { display: flex; flex-direction: column; gap: 6px; }
+    .titulo p { margin: 0; }
+    .aviso { margin: 0; }
     .logo {
       width: 34px; height: 34px; border-radius: 7px; background: var(--ambar);
       display: grid; place-items: center; font: 700 16px var(--fuente-angosta);
@@ -99,7 +109,10 @@ export class Registro {
   error = signal('');
 
   completo() {
-    return this.tallerNombre.trim() && this.nombre.trim() && this.email.trim() && this.password.length >= 8;
+    return (
+      this.tallerNombre.trim() && this.tallerTelefono.trim() && this.nombre.trim() && this.email.trim() &&
+      this.password.length >= 8
+    );
   }
 
   async registrar() {
@@ -109,10 +122,11 @@ export class Registro {
       await this.auth.registro({
         taller: {
           nombre: this.tallerNombre.trim(),
-          telefono: this.tallerTelefono.trim() || undefined,
+          telefono: this.tallerTelefono.trim(),
           direccion: this.tallerDireccion.trim() || undefined,
         },
         usuario: { nombre: this.nombre.trim(), email: this.email.trim(), password: this.password },
+        con_ejemplos: true,
       });
       this.router.navigate(['/']);
     } catch (err) {

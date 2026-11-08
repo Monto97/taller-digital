@@ -14,6 +14,8 @@ const registro = z.object({
     email,
     password,
   }),
+  // Lo manda la pantalla de registro: carga autos de ejemplo para no arrancar con el tablero vacío.
+  con_ejemplos: z.boolean().optional(),
 });
 
 const login = z.object({

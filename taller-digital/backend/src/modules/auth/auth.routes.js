@@ -4,6 +4,7 @@ const validate = require('../../middlewares/validate');
 const { requireAuth } = require('../../middlewares/auth');
 const schemas = require('./auth.schemas');
 const service = require('./auth.service');
+const avisos = require('../../utils/avisos');
 
 const router = Router();
 
@@ -21,7 +22,10 @@ const limitadorAuth = rateLimit({
 
 // El registro es abierto: cualquier taller puede crear su cuenta desde /registro.
 router.post('/registro', limitadorAuth, validate({ body: schemas.registro }), async (req, res) => {
-  res.status(201).json(await service.registro(req.datos.body));
+  const resultado = await service.registro(req.datos.body);
+  res.status(201).json(resultado);
+  // Después de responder: si el aviso falla o tarda, el registro ya quedó hecho.
+  avisos.nuevoRegistro(req.datos.body, resultado.taller);
 });
 
 router.post('/login', limitadorAuth, validate({ body: schemas.login }), async (req, res) => {

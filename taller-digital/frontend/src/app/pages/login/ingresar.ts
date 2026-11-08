@@ -37,7 +37,10 @@ import { AuthService } from '../../core/auth';
           {{ enviando() ? 'Ingresando…' : 'Ingresar' }}
         </button>
 
-        <p class="pie suave">¿Todavía no tenés cuenta? <a routerLink="/registro">Creá tu taller</a></p>
+        <div class="nuevo">
+          <p class="suave">¿Tenés un taller y todavía no usás Taller Digital?</p>
+          <a routerLink="/registro" class="btn btn-borde btn-ancho">Probar gratis 1 mes</a>
+        </div>
       </form>
     </div>
   `,
@@ -48,7 +51,8 @@ import { AuthService } from '../../core/auth';
       padding: 28px 24px; display: flex; flex-direction: column; gap: 18px;
     }
     .marca { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 1.05rem; }
-    .pie { text-align: center; margin: 0; }
+    .nuevo { display: flex; flex-direction: column; gap: 10px; padding-top: 18px; border-top: 1px solid var(--linea); }
+    .nuevo p { margin: 0; text-align: center; }
     .logo {
       width: 34px; height: 34px; border-radius: 7px; background: var(--ambar);
       display: grid; place-items: center; font: 700 16px var(--fuente-angosta);

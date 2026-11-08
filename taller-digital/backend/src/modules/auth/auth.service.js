@@ -3,6 +3,7 @@ const { pool, withTransaction } = require('../../db/pool');
 const AppError = require('../../utils/AppError');
 const { slugify, normalizarTelefono } = require('../../utils/formato');
 const { firmarToken, esAdmin } = require('../../middlewares/auth');
+const ejemplos = require('../taller/ejemplos');
 
 const BCRYPT_ROUNDS = 12;
 // Hash de relleno: se compara igual cuando el email no existe, para no revelar
@@ -31,7 +32,7 @@ async function slugDisponible(conn, nombre) {
   return `${base}-${n}`;
 }
 
-async function registro({ taller, usuario }) {
+async function registro({ taller, usuario, con_ejemplos: conEjemplos = false }) {
   const [existentes] = await pool.query('SELECT id FROM usuarios WHERE email = ?', [usuario.email]);
   if (existentes.length > 0) {
     throw AppError.conflicto('EMAIL_EN_USO', 'Ya existe una cuenta con ese email.');
@@ -42,9 +43,10 @@ async function registro({ taller, usuario }) {
   try {
     return await withTransaction(async (conn) => {
       const slug = await slugDisponible(conn, taller.nombre);
+      const telefono = normalizarTelefono(taller.telefono);
       const [resTaller] = await conn.query(
         'INSERT INTO talleres (nombre, slug, telefono, direccion) VALUES (?, ?, ?, ?)',
-        [taller.nombre, slug, normalizarTelefono(taller.telefono), taller.direccion ?? null],
+        [taller.nombre, slug, telefono, taller.direccion ?? null],
       );
       const tallerId = resTaller.insertId;
 
@@ -53,6 +55,8 @@ async function registro({ taller, usuario }) {
          VALUES (?, ?, ?, ?, 'dueno')`,
         [tallerId, usuario.nombre, usuario.email, passwordHash],
       );
+
+      if (conEjemplos) await ejemplos.cargar(conn, tallerId, resUsuario.insertId, telefono);
 
       return armarRespuesta(
         { id: resUsuario.insertId, taller_id: tallerId, nombre: usuario.nombre, email: usuario.email, rol: 'dueno' },

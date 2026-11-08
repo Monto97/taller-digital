@@ -62,6 +62,7 @@ CREATE TABLE clientes (
   telefono    VARCHAR(30)   NULL COMMENT 'Formato E.164 sin +, ej. 5492215550143, para links wa.me',
   email       VARCHAR(160)  NULL,
   notas       TEXT          NULL,
+  es_ejemplo  TINYINT(1)    NOT NULL DEFAULT 0 COMMENT 'Cargado al registrarse para mostrar la app; se borra desde el tablero',
   created_at  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   deleted_at  DATETIME      NULL,
